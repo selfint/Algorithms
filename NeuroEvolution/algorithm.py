@@ -37,8 +37,6 @@ class Model:
             ))
             self.biases.append(np.random.normal(size=layer_dimension))
 
-        # TODO: generate weights
-        # TODO: generate biases
         # TODO: add feed forward method
 
     def act(self, observation) -> List[float]:
