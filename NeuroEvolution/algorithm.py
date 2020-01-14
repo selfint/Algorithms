@@ -30,17 +30,19 @@ class Model:
         self.weights: list = []
         self.biases: list = []
 
-        previous_layer_size = self.input_shape
-        for layer_dimension in hidden_layers:
-            self.weights.append(np.random.normal(
-                size=(layer_dimension, previous_layer_size)
-            ))
-            self.biases.append(np.random.normal(size=layer_dimension))
+        previous_layer_size = np.prod(self.input_shape)
+        for layer_dimension in hidden_layers + [np.prod(self.output_shape)]:
+            self.weights.append(
+                np.random.normal(size=(layer_dimension, previous_layer_size))
+            )
+            self.biases.append(np.random.normal(size=(layer_dimension, 1)))
 
-        # TODO: add feed forward method
-
-    def act(self, observation) -> List[float]:
-        pass
+    def feed_forward(self, observation: List[float]) -> List[float]:
+        last_layer_output = np.array(observation).reshape(self.input_shape)
+        for layer_weights, layer_biases in zip(self.weights, self.biases):
+            last_layer_output = last_layer_output * layer_weights + layer_biases
+        last_layer_output = np.array(last_layer_output).reshape(self.output_shape)
+        return last_layer_output
 
 
 class NeuroEvolution:
@@ -70,7 +72,9 @@ class NeuroEvolution:
         """
         actions = []
         for agent, observation in zip(self.population, observations):
-            actions.append(agent.act(observation))
+            actions.append(agent.feed_forward(observation))
+
+        return actions
 
     def generate_model(
         self,
@@ -79,6 +83,7 @@ class NeuroEvolution:
         output_shape: Union[int, Tuple[int]],
     ) -> Model:
         return Model(input_shape, hidden_layers, output_shape)
+
 
 if __name__ == "__main__":
     ne = NeuroEvolution(10, 5, [2, 3], 4)
