@@ -4,14 +4,14 @@ from typing import Union, Tuple, List
 
 class Model:
     def __init__(
-        self,
-        input_shape: Union[int, Tuple[int]],
-        hidden_layers: List[int],
-        output_shape: Union[int, Tuple[int]],
-        activation=lambda x: max(0, x),
-        output=lambda x: (1.0 / (1.0 + np.exp(-x))),
+            self,
+            input_shape: Union[int, Tuple[int]],
+            hidden_layers: List[int],
+            output_shape: Union[int, Tuple[int]],
+            activation=lambda x: max(0, x),
+            output_activation=lambda x: (1.0 / (1.0 + np.exp(-x))),
     ):
-        """Generate a model with feed forward capabilites
+        """Generate a model with feed forward capabilities
         
         Arguments:
             input_shape {Union[int, Tuple[int]]} -- shape of expected input
@@ -20,10 +20,12 @@ class Model:
         
         Keyword Arguments:
             activation {function} -- activation function for hidden layers 
-                                     (default: {lambdax:max(0, x)})
-            output {function} -- activaiton function for output layer 
-                                 (default: {lambdax:(1.0 / (1.0 + np.exp(-x)))})
+                                     (default: {lambda x:max(0, x)})
+            output_activation {function} -- activation function for output layer
+                                 (default: {lambda x:(1.0 / (1.0 + np.exp(-x)))})
         """
+        self.output_activation = output_activation
+        self.activation = activation
         self.input_shape = input_shape
         self.output_shape = output_shape
 
@@ -31,7 +33,7 @@ class Model:
         self.biases: list = []
 
         previous_layer_size = np.prod(self.input_shape)
-        for layer_dimension in hidden_layers + [np.prod(self.output_shape)]:
+        for layer_dimension in hidden_layers + [int(np.prod(self.output_shape))]:
             self.weights.append(
                 np.random.normal(size=(layer_dimension, previous_layer_size))
             )
@@ -50,11 +52,11 @@ class NeuroEvolution:
     # TODO: add mutation method
     # TODO: add crossover method
     def __init__(
-        self,
-        population_size: int,
-        input_shape: Union[int, Tuple[int]],
-        hidden_layers: List[int],
-        output_shape: Union[int, Tuple[int]],
+            self,
+            population_size: int,
+            input_shape: Union[int, Tuple[int]],
+            hidden_layers: List[int],
+            output_shape: Union[int, Tuple[int]],
     ):
         self.population_size = population_size
         self.input_shape = input_shape
@@ -76,11 +78,11 @@ class NeuroEvolution:
 
         return actions
 
+    @staticmethod
     def generate_model(
-        self,
-        input_shape: Union[int, Tuple[int]],
-        hidden_layers: List[int],
-        output_shape: Union[int, Tuple[int]],
+            input_shape: Union[int, Tuple[int]],
+            hidden_layers: List[int],
+            output_shape: Union[int, Tuple[int]],
     ) -> Model:
         return Model(input_shape, hidden_layers, output_shape)
 
