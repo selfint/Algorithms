@@ -69,7 +69,7 @@ class NeuroEvolution:
         )
 
         # generate new weights and biases
-        for agent in self.agents:
+        for _ in self.agents:
 
             # choose two random parents
             a, b = np.random.choice(
