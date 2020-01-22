@@ -6,6 +6,11 @@ import gym
 
 
 class NeuroEvolution:
+
+    agent_outputs: List[np.ndarray]
+    agent_weights: List[List[np.ndarray]]
+    agent_biases: List[List[np.ndarray]]
+
     def __init__(
         self,
         amount: int,
@@ -18,7 +23,7 @@ class NeuroEvolution:
         self.input_shape = input_shape
         self.hidden_dimensions = hidden_dimensions
         self.output_shape = output_shape
-        self.agent_outputs = [None for _ in self.agents]
+        self.agent_outputs = [np.zeros(shape=self.output_shape) for _ in self.agents]
         self.mutation_rate = mutation_rate
 
         # generate agents
@@ -28,13 +33,11 @@ class NeuroEvolution:
         output_layer = int(np.prod(self.output_shape))
         layers = [input_layer] + hidden_dimensions + [output_layer]
         for _ in self.agents:
-            new_weights = [
-                np.random.normal(size=(layers[i], layers[i - 1]))
-                for i in range(1, len(layers))
-            ]
-            new_biases = [
-                np.random.normal(size=layer_size) for layer_size in layers[1:]
-            ]
+            new_weights = []
+            new_biases = []
+            for i in range(1, len(layers)):
+                new_weights.append(np.random.normal(size=(layers[i], layers[i - 1])))
+                new_biases.append(np.random.normal(size=layers[i]))
             self.agent_weights.append(new_weights)
             self.agent_biases.append(new_biases)
 
@@ -101,7 +104,7 @@ if __name__ == "__main__":
         hidden_layers,
         0.001,
     )
-    for i in range(episodes):
+    for _ in range(episodes):
 
         # get agent actions
         neuro.calculate_outputs(observations)
