@@ -63,9 +63,7 @@ class NeuroEvolution:
         """
         new_weights = []
         new_biases = []
-        normalized_fitness_levels = (
-            agent_fitness_levels / agent_fitness_levels.sum()
-        )
+        normalized_fitness_levels = agent_fitness_levels / agent_fitness_levels.sum()
 
         # generate new weights and biases
         for _ in self.agents:
