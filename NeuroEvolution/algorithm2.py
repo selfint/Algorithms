@@ -143,7 +143,7 @@ if __name__ == "__main__":
             env.reset()
         average_rewards = np.average(rewards)
         if episode % 20 == 0:
-            print(f"episode {episode}>= avg={average_rewards} max={rewards.max()}")
+            print(f"episode {episode}>= avg={average_rewards} max={np.max(rewards)}")
         episode_avg_rewards.append(average_rewards)
         modified_rewards = np.power(rewards, 2)
         neuro.new_generation(modified_rewards)
