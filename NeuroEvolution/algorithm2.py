@@ -1,6 +1,6 @@
 from collections import namedtuple
 from typing import Tuple, List
-
+import matplotlib.pyplot as plt
 import numpy as np
 import gym
 
@@ -57,15 +57,14 @@ class NeuroEvolution:
 
             self.agent_outputs[agent] = previous_layer_output.reshape(self.output_shape)
 
-    def new_generation(self, agent_fitness_levels: List[float]):
+    def new_generation(self, agent_fitness_levels: np.ndarray):
         """
         spawn a new generation using crossover and mutation judging agents by their fitness
         """
         new_weights = []
         new_biases = []
-        normalized_fitness_levels = np.array(agent_fitness_levels)
         normalized_fitness_levels = (
-            normalized_fitness_levels / normalized_fitness_levels.sum()
+            agent_fitness_levels / agent_fitness_levels.sum()
         )
 
         # generate new weights and biases
@@ -92,8 +91,9 @@ class NeuroEvolution:
 if __name__ == "__main__":
     # env setup
     ENV_NAME = "CartPole-v0"
-    episodes = 50
-    agents = 10
+    episodes = 10000
+    episode_steps = 210
+    agents = 50
     environments = [gym.make(ENV_NAME) for _ in range(agents)]
     observations = [env.reset() for env in environments][0]
     hidden_layers = [5]
@@ -104,25 +104,53 @@ if __name__ == "__main__":
         hidden_layers,
         0.001,
     )
-    for _ in range(episodes):
 
-        # get agent actions
-        neuro.calculate_outputs(observations)
-        observations = []
-        rewards = []
-        reset = True
-        for action, environment in zip(neuro.agent_outputs, environments):
-            observation, reward, done, _ = environment.step(np.argmax(action))
-            rewards.append(reward)
-            observations.append(observation)
+    episode_avg_rewards = []
 
-            if not done:
-                reset = False
+    for episode in range(episodes):
 
-        if reset:
-            for env in environments:
-                env.reset()
+        rewards = np.ones(shape=len(neuro.agents))
+        env_states = [False for env in environments]
+        for step in range(episode_steps):
+
+            # get agent actions
+            neuro.calculate_outputs(observations)
+            observations = []
+            reset = True
+            for (agent_index, action), (env_index, environment) in zip(
+                enumerate(neuro.agent_outputs), enumerate(environments)
+            ):
+
+                # don't act in environment if simulation is done
+                if env_states[env_index]:
+                    observations.append(np.zeros(shape=neuro.input_shape))
+                    continue
+
+                observation, reward, done, _ = environment.step(np.argmax(action))
+
+                rewards[agent_index] += reward
+                observations.append(observation)
+
+                if done:
+                    env_states[env_index] = True
+                else:
+                    reset = False
+
+            if reset:
+                break
+
+        for env in environments:
+            env.reset()
+        average_rewards = np.average(rewards)
+        if episode % 20 == 0:
+            print(f"episode {episode}>= avg={average_rewards} max={rewards.max()}")
+        episode_avg_rewards.append(average_rewards)
+        modified_rewards = np.power(rewards, 2)
+        neuro.new_generation(modified_rewards)
 
     # close environments
     for env in environments:
         env.close()
+
+    plt.plot(episode_avg_rewards)
+    plt.show()
