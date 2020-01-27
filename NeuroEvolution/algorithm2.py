@@ -68,14 +68,14 @@ class NeuroEvolution:
         """
         spawn a new generation using crossover and mutation judging agents by their fitness
         """
-        new_weights = []
-        new_biases = []
+        new_generation_weights = []
+        new_generation_biases = []
         normalized_fitness_levels: np.ndarray = agent_fitness_levels / agent_fitness_levels.sum()
 
         # keep the best agent from the previous generation
         if self.keep_champion:
-            new_weights.append(self.agent_weights[normalized_fitness_levels.argmax()])
-            new_biases.append(self.agent_biases[normalized_fitness_levels.argmax()])
+            new_generation_weights.append(self.agent_weights[normalized_fitness_levels.argmax()])
+            new_generation_biases.append(self.agent_biases[normalized_fitness_levels.argmax()])
 
         # keep survival_rate * 100 % of agents from the previous generation
         if self.survival_rate:
@@ -85,37 +85,38 @@ class NeuroEvolution:
                 size=int(len(self.agents) * self.survival_rate),
                 p=normalized_fitness_levels,
             )
-            new_weights.extend(list(np.array(self.agent_weights)[new_weights_and_biases]))
-            new_biases.extend(list(np.array(self.agent_biases)[new_weights_and_biases]))
+            new_generation_weights.extend(list(np.array(self.agent_weights)[new_weights_and_biases]))
+            new_generation_biases.extend(list(np.array(self.agent_biases)[new_weights_and_biases]))
 
         # generate new weights and biases for each new agent
-        while len(new_biases) < len(self.agents):
+        while len(new_generation_biases) < len(self.agents):
 
             # choose two random parents
-            a, b = np.random.choice(
+            parent_a, parent_b = np.random.choice(
                 self.agents, size=2, replace=False, p=normalized_fitness_levels
             )
-            agent_weights = self.agent_weights[a][:]
-            agent_biases = self.agent_biases[a][:]
-            for i in range(len(agent_weights)):
-                for j in range(len(agent_weights[i])):
 
-                    # generate new weights using mutation and crossover
-                    for k in range(len(agent_weights[i][j])):
+            # generate new agent weights and biases
+            new_agent_weights = self.agent_weights[parent_a][:]
+            new_agent_biases = self.agent_biases[parent_a][:]
+            for i in range(len(new_agent_weights)):
+                for j in range(len(new_agent_weights[i])):
+                    for k in range(len(new_agent_weights[i][j])):
                         if np.random.random() < self.mutation_rate:
-                            agent_weights[i][j][k] = np.random.normal()
+                            new_agent_weights[i][j][k] = np.random.normal()
                         elif np.random.random() < 0.5:
-                            agent_weights[i][j][k] = self.agent_weights[b][i][j][k]
+                            new_agent_weights[i][j][k] = self.agent_weights[parent_b][i][j][k]
 
-                    # generate new biases using mutation and crossover
                     if np.random.random() < self.mutation_rate:
-                        agent_biases[i][j] = np.random.normal()
+                        new_agent_biases[i][j] = np.random.normal()
                     elif np.random.random() < 0.5:
-                        agent_biases[i][j] = self.agent_biases[b][i][j]
-            new_weights.append(agent_weights)
-            new_biases.append(agent_biases)
-        self.agent_weights = new_weights
-        self.agent_biases = new_biases
+                        new_agent_biases[i][j] = self.agent_biases[parent_b][i][j]
+            new_generation_weights.append(new_agent_weights)
+            new_generation_biases.append(new_agent_biases)
+
+        # set generation to new generation
+        self.agent_weights = new_generation_weights
+        self.agent_biases = new_generation_biases
 
 
 def training_loop(
@@ -207,7 +208,7 @@ if __name__ == "__main__":
     from multiprocessing import Pool
     from itertools import product, repeat
 
-    # env setup
+    # env and hyper parameters setup
     ENV_NAME = "CartPole-v0"
     EPISODES = 100
     EPISODE_STEPS = 210
@@ -218,7 +219,9 @@ if __name__ == "__main__":
     KEEP_CHAMPION = False
     SURVIVAL_RATE = 0.4
 
-    for trial_run, (episode_avg_rewards, episode_max_rewards) in enumerate(
+    # run trainer and get avg and max rewards for each episode during training
+    # use Pool to run trainers in parallel
+    for trial_run, (training_avg_rewards, training_max_rewards) in enumerate(
         Pool(TRIALS).starmap(
             training_loop,
             repeat(
@@ -237,7 +240,10 @@ if __name__ == "__main__":
         )
     ):
 
-        plt.plot(episode_max_rewards, label=f"max_reward_{trial_run}")
-        # plt.plot(episode_avg_rewards, label=f"avg_reward_{trial_run}")
+        # add training results to plot
+        plt.plot(training_max_rewards, label=f"max_reward_{trial_run}")
+        plt.plot(training_avg_rewards, label=f"avg_reward_{trial_run}")
+
+    # plot training results
     plt.legend()
     plt.show()
