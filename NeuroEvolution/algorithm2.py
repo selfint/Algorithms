@@ -1,4 +1,3 @@
-from collections import namedtuple
 from typing import Tuple, List
 import matplotlib.pyplot as plt
 import numpy as np
@@ -21,6 +20,7 @@ class NeuroEvolution:
         keep_champion: bool = False,
         survival_rate: float = 0.0,
     ):
+        # each agent is represented as in index, instead of an object
         self.agents = range(amount)
         self.input_shape = input_shape
         self.hidden_dimensions = hidden_dimensions
@@ -30,7 +30,7 @@ class NeuroEvolution:
         self.keep_champion = keep_champion
         self.survival_rate = survival_rate
 
-        # generate agents
+        # generate agent weights and biases using a normal distribution
         self.agent_weights = []
         self.agent_biases = []
         input_layer = int(np.prod(self.input_shape))
@@ -47,8 +47,11 @@ class NeuroEvolution:
 
     def calculate_outputs(self, inputs: List[np.ndarray]):
         """
-        calculate the output of each agent
+        calculate the output of each agent with respect to the inputs
         """
+
+        # get the weights and biases for each agent and calculate the output
+        # for the inputs using forward propagation
         for agent, input_, weights, biases in zip(
             self.agents, inputs, self.agent_weights, self.agent_biases
         ):
@@ -85,7 +88,7 @@ class NeuroEvolution:
             new_weights.extend(list(np.array(self.agent_weights)[new_weights_and_biases]))
             new_biases.extend(list(np.array(self.agent_biases)[new_weights_and_biases]))
 
-        # generate new weights and biases
+        # generate new weights and biases for each new agent
         while len(new_biases) < len(self.agents):
 
             # choose two random parents
@@ -96,11 +99,19 @@ class NeuroEvolution:
             agent_biases = self.agent_biases[a][:]
             for i in range(len(agent_weights)):
                 for j in range(len(agent_weights[i])):
+
+                    # generate new weights using mutation and crossover
                     for k in range(len(agent_weights[i][j])):
                         if np.random.random() < self.mutation_rate:
                             agent_weights[i][j][k] = np.random.normal()
                         elif np.random.random() < 0.5:
                             agent_weights[i][j][k] = self.agent_weights[b][i][j][k]
+
+                    # generate new biases using mutation and crossover
+                    if np.random.random() < self.mutation_rate:
+                        agent_biases[i][j] = np.random.normal()
+                    elif np.random.random() < 0.5:
+                        agent_biases[i][j] = self.agent_biases[b][i][j]
             new_weights.append(agent_weights)
             new_biases.append(agent_biases)
         self.agent_weights = new_weights
@@ -117,8 +128,12 @@ def training_loop(
     keep_champion: bool,
     survival_rate: float,
 ):
+
+    # initialize environments
     environments = [gym.make(env_name) for _ in range(agents)]
     observations = [env.reset() for env in environments]
+
+    # build neuro evolution trainer
     neuro = NeuroEvolution(
         agents,
         environments[0].observation_space.shape,
@@ -129,14 +144,16 @@ def training_loop(
         survival_rate,
     )
 
+    # logging
     avg_rewards = []
     max_rewards = []
 
     # training loop
     for episode in range(episodes):
 
-        rewards = np.ones(shape=len(neuro.agents))
-        env_states = [False for env in environments]
+        # initialize rewards at 1 to avoid 0 division errors
+        episode_rewards = np.ones(shape=len(neuro.agents))
+        env_states = [False for _ in environments]
         for step in range(episode_steps):
 
             # get agent actions
@@ -152,11 +169,12 @@ def training_loop(
                     observations.append(np.zeros(shape=neuro.input_shape))
                     continue
 
+                # take action and log reward and new observation
                 observation, reward, done, _ = environment.step(np.argmax(action))
-
-                rewards[agent_index] += reward
+                episode_rewards[agent_index] += reward
                 observations.append(observation)
 
+                # don't reset simulation till all environments are done
                 if done:
                     env_states[env_index] = True
                 else:
@@ -165,14 +183,17 @@ def training_loop(
             if reset:
                 break
 
-        for env in environments:
-            env.reset()
-        average_rewards = np.average(rewards)
-        max_reward = np.max(rewards)
+        # reset environments and get initial observations
+        observations = [env.reset() for env in environments]
+
+        # log average and max rewards for all agents in this episode
+        average_rewards = np.average(episode_rewards)
+        max_reward = np.max(episode_rewards)
         avg_rewards.append(average_rewards)
         max_rewards.append(max_reward)
-        rewards = np.power(rewards, 1)
-        neuro.new_generation(rewards)
+
+        # generate new generation with respect to the episode rewards
+        neuro.new_generation(episode_rewards)
 
     # close environments
     for env in environments:
@@ -188,10 +209,10 @@ if __name__ == "__main__":
 
     # env setup
     ENV_NAME = "CartPole-v0"
-    EPISODES = 50
+    EPISODES = 100
     EPISODE_STEPS = 210
     AGENTS = 10
-    TRIALS = 3
+    TRIALS = 5
     HIDDEN_LAYERS = []
     MUTATION_RATE = 0.01
     KEEP_CHAMPION = False
@@ -217,6 +238,6 @@ if __name__ == "__main__":
     ):
 
         plt.plot(episode_max_rewards, label=f"max_reward_{trial_run}")
-        plt.plot(episode_avg_rewards, label=f"avg_reward_{trial_run}")
+        # plt.plot(episode_avg_rewards, label=f"avg_reward_{trial_run}")
     plt.legend()
     plt.show()
