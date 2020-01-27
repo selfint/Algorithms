@@ -18,6 +18,8 @@ class NeuroEvolution:
         output_shape: Tuple[int, ...],
         hidden_dimensions: List[int],
         mutation_rate: float = 0.001,
+        keep_champion: bool = False,
+        survival_rate: float = 0.0,
     ):
         self.agents = range(amount)
         self.input_shape = input_shape
@@ -25,6 +27,8 @@ class NeuroEvolution:
         self.output_shape = output_shape
         self.agent_outputs = [np.zeros(shape=self.output_shape) for _ in self.agents]
         self.mutation_rate = mutation_rate
+        self.keep_champion = keep_champion
+        self.survival_rate = survival_rate
 
         # generate agents
         self.agent_weights = []
@@ -57,9 +61,7 @@ class NeuroEvolution:
 
             self.agent_outputs[agent] = previous_layer_output.reshape(self.output_shape)
 
-    def new_generation(
-        self, agent_fitness_levels: np.ndarray, keep_champion: bool = False
-    ):
+    def new_generation(self, agent_fitness_levels: np.ndarray):
         """
         spawn a new generation using crossover and mutation judging agents by their fitness
         """
@@ -67,9 +69,21 @@ class NeuroEvolution:
         new_biases = []
         normalized_fitness_levels: np.ndarray = agent_fitness_levels / agent_fitness_levels.sum()
 
-        if keep_champion:
+        # keep the best agent from the previous generation
+        if self.keep_champion:
             new_weights.append(self.agent_weights[normalized_fitness_levels.argmax()])
             new_biases.append(self.agent_biases[normalized_fitness_levels.argmax()])
+
+        # keep survival_rate * 100 % of agents from the previous generation
+        if self.survival_rate:
+            new_weights_and_biases = np.random.choice(
+                self.agents,
+                replace=False,
+                size=int(len(self.agents) * self.survival_rate),
+                p=normalized_fitness_levels,
+            )
+            new_weights.extend(list(np.array(self.agent_weights)[new_weights_and_biases]))
+            new_biases.extend(list(np.array(self.agent_biases)[new_weights_and_biases]))
 
         # generate new weights and biases
         while len(new_biases) < len(self.agents):
@@ -80,12 +94,13 @@ class NeuroEvolution:
             )
             agent_weights = self.agent_weights[a][:]
             agent_biases = self.agent_biases[a][:]
-            for i, layer in enumerate(agent_weights):
-                for j in range(len(layer)):
-                    if np.random.random() < self.mutation_rate:
-                        agent_weights[i][j] = np.random.normal()
-                    elif np.random.random() < 0.5:
-                        agent_weights[i][j] = self.agent_weights[b][i][j]
+            for i in range(len(agent_weights)):
+                for j in range(len(agent_weights[i])):
+                    for k in range(len(agent_weights[i][j])):
+                        if np.random.random() < self.mutation_rate:
+                            agent_weights[i][j][k] = np.random.normal()
+                        elif np.random.random() < 0.5:
+                            agent_weights[i][j][k] = self.agent_weights[b][i][j][k]
             new_weights.append(agent_weights)
             new_biases.append(agent_biases)
         self.agent_weights = new_weights
@@ -100,6 +115,7 @@ def training_loop(
     hidden_layers: List[int],
     mutation_rate: float,
     keep_champion: bool,
+    survival_rate: float,
 ):
     environments = [gym.make(env_name) for _ in range(agents)]
     observations = [env.reset() for env in environments]
@@ -109,6 +125,8 @@ def training_loop(
         environments[0].action_space.n,
         hidden_layers,
         mutation_rate,
+        keep_champion,
+        survival_rate,
     )
 
     avg_rewards = []
@@ -154,7 +172,7 @@ def training_loop(
         avg_rewards.append(average_rewards)
         max_rewards.append(max_reward)
         rewards = np.power(rewards, 1)
-        neuro.new_generation(rewards, keep_champion=keep_champion)
+        neuro.new_generation(rewards)
 
     # close environments
     for env in environments:
@@ -170,13 +188,14 @@ if __name__ == "__main__":
 
     # env setup
     ENV_NAME = "CartPole-v0"
-    EPISODES = 300
+    EPISODES = 50
     EPISODE_STEPS = 210
-    AGENTS = 50
-    TRIALS = 10
-    HIDDEN_LAYERS = [5]
-    MUTATION_RATE = 0.0000
-    KEEP_CHAMPION = True
+    AGENTS = 10
+    TRIALS = 3
+    HIDDEN_LAYERS = []
+    MUTATION_RATE = 0.01
+    KEEP_CHAMPION = False
+    SURVIVAL_RATE = 0.4
 
     for trial_run, (episode_avg_rewards, episode_max_rewards) in enumerate(
         Pool(TRIALS).starmap(
@@ -190,18 +209,14 @@ if __name__ == "__main__":
                     HIDDEN_LAYERS,
                     MUTATION_RATE,
                     KEEP_CHAMPION,
+                    SURVIVAL_RATE
                 ),
                 times=TRIALS,
             ),
         )
     ):
 
-        plt.plot(
-            [
-                np.average(episode_max_rewards[:i])
-                for i in range(len(episode_max_rewards))
-            ],
-            label=f"max_trend_{trial_run}",
-        )
+        plt.plot(episode_max_rewards, label=f"max_reward_{trial_run}")
+        plt.plot(episode_avg_rewards, label=f"avg_reward_{trial_run}")
     plt.legend()
     plt.show()
