@@ -1,91 +1,118 @@
+from typing import Tuple, List
 import numpy as np
-from typing import Union, Tuple, List
-
-
-class Model:
-    def __init__(
-            self,
-            input_shape: Union[int, Tuple[int]],
-            hidden_layers: List[int],
-            output_shape: Union[int, Tuple[int]],
-            activation=lambda x: max(0, x),
-            output_activation=lambda x: (1.0 / (1.0 + np.exp(-x))),
-    ):
-        """Generate a model with feed forward capabilities
-        
-        Arguments:
-            input_shape {Union[int, Tuple[int]]} -- shape of expected input
-            hidden_layers {List[int]} -- dimensions of hidden layers, if any
-            output_shape {Union[int, Tuple[int]]} -- shape of output
-        
-        Keyword Arguments:
-            activation {function} -- activation function for hidden layers 
-                                     (default: {lambda x:max(0, x)})
-            output_activation {function} -- activation function for output layer
-                                 (default: {lambda x:(1.0 / (1.0 + np.exp(-x)))})
-        """
-        self.output_activation = output_activation
-        self.activation = activation
-        self.input_shape = input_shape
-        self.output_shape = output_shape
-
-        self.weights: list = []
-        self.biases: list = []
-
-        previous_layer_size = np.prod(self.input_shape)
-        for layer_dimension in hidden_layers + [int(np.prod(self.output_shape))]:
-            self.weights.append(
-                np.random.normal(size=(layer_dimension, previous_layer_size))
-            )
-            self.biases.append(np.random.normal(size=(layer_dimension, 1)))
-
-    def feed_forward(self, observation: List[float]) -> List[float]:
-        last_layer_output = np.array(observation).reshape(self.input_shape)
-        for layer_weights, layer_biases in zip(self.weights, self.biases):
-            last_layer_output = last_layer_output * layer_weights + layer_biases
-        last_layer_output = np.array(last_layer_output).reshape(self.output_shape)
-        return last_layer_output
+import gym
 
 
 class NeuroEvolution:
 
-    # TODO: add mutation method
-    # TODO: add crossover method
+    agent_outputs: List[np.ndarray]
+    agent_weights: List[List[np.ndarray]]
+    agent_biases: List[List[np.ndarray]]
+
     def __init__(
-            self,
-            population_size: int,
-            input_shape: Union[int, Tuple[int]],
-            hidden_layers: List[int],
-            output_shape: Union[int, Tuple[int]],
+        self,
+        amount: int,
+        input_shape: Tuple[int, ...],
+        output_shape: Tuple[int, ...],
+        hidden_dimensions: List[int],
+        mutation_rate: float = 0.001,
+        keep_champion: bool = False,
+        survival_rate: float = 0.0,
     ):
-        self.population_size = population_size
+        # each agent is represented as in index, instead of an object
+        self.agents = range(amount)
         self.input_shape = input_shape
+        self.hidden_dimensions = hidden_dimensions
         self.output_shape = output_shape
-        self.population = [
-            self.generate_model(input_shape, hidden_layers, output_shape)
-            for _ in range(population_size)
-        ]
+        self.agent_outputs = [np.zeros(shape=self.output_shape) for _ in self.agents]
+        self.mutation_rate = mutation_rate
+        self.keep_champion = keep_champion
+        self.survival_rate = survival_rate
 
-    def get_actions(self, observations: list):
-        """Get the actions for each agent according to each observation
-        
-        Arguments:
-            observations {list} -- list of gym observations
+        # generate agent weights and biases using a normal distribution
+        self.agent_weights = []
+        self.agent_biases = []
+        input_layer = int(np.prod(self.input_shape))
+        output_layer = int(np.prod(self.output_shape))
+        layers = [input_layer] + self.hidden_dimensions + [output_layer]
+        for _ in self.agents:
+            new_weights = []
+            new_biases = []
+            for i in range(1, len(layers)):
+                new_weights.append(np.random.normal(size=(layers[i], layers[i - 1])))
+                new_biases.append(np.random.normal(size=layers[i]))
+            self.agent_weights.append(new_weights)
+            self.agent_biases.append(new_biases)
+
+    def calculate_outputs(self, inputs: List[np.ndarray]):
         """
-        actions = []
-        for agent, observation in zip(self.population, observations):
-            actions.append(agent.feed_forward(observation))
+        calculate the output of each agent with respect to the inputs
+        """
 
-        return actions
+        # get the weights and biases for each agent and calculate the output
+        # for the inputs using forward propagation
+        for agent, input_, weights, biases in zip(
+            self.agents, inputs, self.agent_weights, self.agent_biases
+        ):
+            previous_layer_output: np.ndarray = input_.reshape(-1, 1)
+            for layer_weights, layer_biases in zip(weights, biases):
+                previous_layer_output = (
+                    np.sum(previous_layer_output.T * layer_weights, axis=1)
+                    + layer_biases
+                )
 
-    @staticmethod
-    def generate_model(
-            input_shape: Union[int, Tuple[int]],
-            hidden_layers: List[int],
-            output_shape: Union[int, Tuple[int]],
-    ) -> Model:
-        return Model(input_shape, hidden_layers, output_shape)
+            self.agent_outputs[agent] = previous_layer_output.reshape(self.output_shape)
 
+    def new_generation(self, agent_fitness_levels: np.ndarray):
+        """
+        spawn a new generation using crossover and mutation judging agents by their fitness
+        """
+        new_generation_weights = []
+        new_generation_biases = []
+        normalized_fitness_levels: np.ndarray = agent_fitness_levels / agent_fitness_levels.sum()
 
-if __name__ == "__main__":
-    ne = NeuroEvolution(10, 5, [2, 3], 4)
+        # keep the best agent from the previous generation
+        if self.keep_champion:
+            new_generation_weights.append(self.agent_weights[normalized_fitness_levels.argmax()])
+            new_generation_biases.append(self.agent_biases[normalized_fitness_levels.argmax()])
+
+        # keep survival_rate * 100 % of agents from the previous generation
+        if self.survival_rate:
+            new_weights_and_biases = np.random.choice(
+                self.agents,
+                replace=False,
+                size=int(len(self.agents) * self.survival_rate),
+                p=normalized_fitness_levels,
+            )
+            new_generation_weights.extend(list(np.array(self.agent_weights)[new_weights_and_biases]))
+            new_generation_biases.extend(list(np.array(self.agent_biases)[new_weights_and_biases]))
+
+        # generate new weights and biases for each new agent
+        while len(new_generation_biases) < len(self.agents):
+
+            # choose two random parents
+            parent_a, parent_b = np.random.choice(
+                self.agents, size=2, replace=False, p=normalized_fitness_levels
+            )
+
+            # generate new agent weights and biases
+            new_agent_weights = self.agent_weights[parent_a][:]
+            new_agent_biases = self.agent_biases[parent_a][:]
+            for i in range(len(new_agent_weights)):
+                for j in range(len(new_agent_weights[i])):
+                    for k in range(len(new_agent_weights[i][j])):
+                        if np.random.random() < self.mutation_rate:
+                            new_agent_weights[i][j][k] = np.random.normal()
+                        elif np.random.random() < 0.5:
+                            new_agent_weights[i][j][k] = self.agent_weights[parent_b][i][j][k]
+
+                    if np.random.random() < self.mutation_rate:
+                        new_agent_biases[i][j] = np.random.normal()
+                    elif np.random.random() < 0.5:
+                        new_agent_biases[i][j] = self.agent_biases[parent_b][i][j]
+            new_generation_weights.append(new_agent_weights)
+            new_generation_biases.append(new_agent_biases)
+
+        # set generation to new generation
+        self.agent_weights = new_generation_weights
+        self.agent_biases = new_generation_biases
