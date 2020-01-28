@@ -2,6 +2,9 @@ from multiprocessing import Pool
 from itertools import repeat
 import matplotlib.pyplot as plt
 import numpy as np
+import gym
+from typing import List
+
 
 from NeuroEvolution.algorithm import NeuroEvolution
 

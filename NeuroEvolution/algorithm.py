@@ -1,6 +1,5 @@
 from typing import Tuple, List
 import numpy as np
-import gym
 
 
 class NeuroEvolution:
