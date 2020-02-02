@@ -33,14 +33,14 @@ crossover.
 * *CrossoverSystem*: Generates an entity from two entities
 
 ### Entities
-* *AgentEntity*: WeightComponent BiasComponent InnovationComponent 
-OutputComponent
+* *AgentEntity*: ConnectionsComponent OutputComponent
 * *EnvironmentEntity*: GymEnvironment (OpenAI Gym object)
 
 ### Components
-* *WeightComponent*: List of weight values
-* *BiasComponent*: List of bias values
-* *InnovationComponent*: List of connection innovation indexes
+* *ConnectionsComponent*: List of connections (connection innovation 
+index, weight value)
+* *NeuronsComponent*: List of neurons (neuron innovation index, bias
+value)
 
 
 
