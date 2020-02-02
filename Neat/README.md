@@ -23,3 +23,24 @@ nodes, but no connections.
 each species.
 5. Generate new generation using mutation and 
 crossover.
+
+## Terms
+### Systems
+* *FeedForwardSystem*: Calculates output of entity
+* *NewGenerationSystem*: Generates a new population
+* *SpeciationSystem*: Assigns species component of entity
+* *MutationSystem*: Mutations an entity
+* *CrossoverSystem*: Generates an entity from two entities
+
+### Entities
+* *AgentEntity*: WeightComponent BiasComponent InnovationComponent 
+OutputComponent
+* *EnvironmentEntity*: GymEnvironment (OpenAI Gym object)
+
+### Components
+* *WeightComponent*: List of weight values
+* *BiasComponent*: List of bias values
+* *InnovationComponent*: List of connection innovation indexes
+
+
+
