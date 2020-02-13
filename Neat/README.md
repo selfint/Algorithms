@@ -77,6 +77,10 @@ crossover.
 
 No need to keep track of past node innovations,so a simple counter will suffice to get the next node innovation ID on mutation.
 
+### Environment
+
+OpenAI gym environment.
+
 ## Logic
 
 ### Network Outputs
