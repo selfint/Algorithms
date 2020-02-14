@@ -85,18 +85,31 @@ OpenAI gym environment.
 
 ## Logic
 
-### Network Outputs
+### Network Reward Evaluation
 
 Calculates the output of each network for each environment. Runs the environments and keeps track of the rewards for each network.
 
 #### Inputs
 
 * Networks
-* Environment States
+* Environments
 
 #### Outputs
 
 * Environment Rewards
+
+### Network Fitness Evaluation
+
+Evaluate the fitness of each network using the rewards from their respective environments.
+
+#### Inputs
+
+* Networks
+* Environment Rewards
+
+#### Outputs
+
+* Network Fitness
 
 ### Network Speciation
 
@@ -111,20 +124,7 @@ Splits the networks into species, with a representative for each species, using 
 * Species - Dict[Network, SpeciesID]
 * SpeciesReps - Dict[SpeciesID, SpeciesRep]
 
-### Network Fitness Evaluator
-
-Evaluate the fitness of each network using the rewards from their respective environments.
-
-#### Inputs
-
-* Networks
-* Environment Rewards
-
-#### Outputs
-
-* Network Fitness
-
-### Network Fitness Normalizer
+### Network Fitness Normalization
 
 Normalize the fitness of each network in each species.
 
@@ -138,7 +138,7 @@ Normalize the fitness of each network in each species.
 
 * Normalized Network Fitness
 
-### New Generation Generator
+### New Networks Generation
 
 Generates a new generation using crossover and mutation.
 
