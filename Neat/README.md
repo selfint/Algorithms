@@ -39,8 +39,10 @@ crossover.
 
 ### Innovations
 
-* Connection Innovations - List of connection innovations
 * Max Node Innovation ID - Counter of node innovations
+* Max Connection Innovation ID - Counter of connection innovations
+* Node Innovations - List of node innovations
+* Connection Innovations - List of connection innovations
 
 ### Input Node
 
@@ -146,3 +148,15 @@ Generates a new generation using crossover and mutation.
 * Networks
 * Network Species
 * Normalized Network Fitness
+
+### New Node Innovation
+
+Handles node mutation generation and logging.
+
+#### Inputs
+
+* Innovation ID of the connection that split.
+
+#### Outputs
+
+* Node Innovation
