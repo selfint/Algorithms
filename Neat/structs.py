@@ -63,12 +63,12 @@ class NeuralNetwork:
         self,
         input_nodes: List[InputNode],
         hidden_nodes: List[HiddenNode],
-        output_node: List[OutputNode],
+        output_nodes: List[OutputNode],
         connections: List[Connection],
         innovations: Innovations,
     ):
         self.input_nodes = input_nodes
         self.hidden_nodes = hidden_nodes
-        self.output_node = output_node
+        self.output_nodes = output_nodes
         self.connections = connections
         self.innovations = innovations
