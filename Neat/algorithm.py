@@ -1,6 +1,6 @@
 from typing import List
 
-from Neat.structs import (
+from structs import (
     Innovations,
     NodeInnovation,
     NeuralNetwork
