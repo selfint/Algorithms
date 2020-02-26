@@ -85,6 +85,31 @@ OpenAI gym environment.
 
 ## Logic
 
+### Feed Forward Network
+
+```mermaid
+graph LR
+    inputs --> b[network weights+biases]
+    b --> |run through all layers|b
+    b --> outputs
+```
+
+### Mutations
+
+#### Weight Mutation
+
+#### Bias Mutation
+
+#### Add Connection Mutation
+
+#### Add Node Mutation
+
+### Crossover
+
+### New Generation
+
+### Network Simulation
+
 ### Network Reward Evaluation
 
 Calculates the output of each network for each environment. Runs the environments and keeps track of the rewards for each network.
