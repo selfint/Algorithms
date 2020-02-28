@@ -4,6 +4,8 @@ Contains all logical operations to that are needed to transform the data
 from typing import List
 
 import numpy as np
+import gym
+from gym import spaces
 
 from structs import (
     BaseNodes,
@@ -99,3 +101,89 @@ def _get_node_output(
         )
         + node_data.biases[node_properties_index]  # add node bias
     )
+
+
+def transform_network_output(network_output: List[float]) -> spaces.Discrete:
+    return np.argmax(network_output)
+
+
+def evaluate_networks(
+    environments: Environments,
+    connections: List[ConnectionInnovation],
+    connection_data: List[ConnectionProperties],
+    node_data: List[NodeProperties],
+    base_nodes: BaseNodes,
+    max_steps: int,
+    episodes: int,
+    render: bool = False,
+) -> List[float]:
+    all_rewards = []
+    for (
+        environment,
+        network_connections,
+        network_connection_data,
+        network_node_data,
+    ) in zip(environments.environments, connections, connection_data, node_data):
+        network_rewards = []
+        for e in range(episodes):
+            print(e)
+            # reset environment
+            episode_reward = _run_episode(
+                environment,
+                max_steps,
+                network_connections,
+                network_connection_data,
+                network_node_data,
+                base_nodes,
+                render,
+            )
+
+            # log reward
+            network_rewards.append(episode_reward)
+        all_rewards.append(np.average(network_rewards))
+    return all_rewards
+
+
+def _run_episode(
+    environment: gym.Env,
+    max_steps: int,
+    connections: List[ConnectionInnovation],
+    connection_data: List[ConnectionProperties],
+    node_data: List[NodeProperties],
+    base_nodes: BaseNodes,
+    render: bool = False,
+) -> float:
+    """helper function that runs an episode and returns the episode rewards
+
+    Arguments:
+        environment {gym.Env} -- gym environment
+        max_steps {int} -- limit of steps to take in episode
+        connections {List[ConnectionInnovation]} -- network connections
+        connection_data {List[ConnectionProperties]} -- network connection data
+        node_data {List[NodeProperties]} -- network node data
+        base_nodes {BaseNodes} -- network input and output nodes
+
+    Returns:
+        float -- network episode reward
+    """
+
+    # reset environment
+    episode_reward = 0
+    observation = environment.reset()
+
+    # play through simulation
+    for _ in range(max_steps):
+        if render:
+            environment.render()
+        network_output = feed_forward(
+            observation, connections, connection_data, node_data, base_nodes,
+        )
+        action = transform_network_output(network_output)
+        observation, reward, done, _ = environment.step(action)
+
+        episode_reward += reward
+
+        if done:
+            break
+    environment.close()
+    return episode_reward

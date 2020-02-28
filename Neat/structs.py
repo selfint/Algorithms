@@ -1,8 +1,9 @@
 from typing import NamedTuple, List, Callable
+import gym
 
 
 class Environments(NamedTuple):
-    environments: list
+    environments: List[gym.Env]
 
 
 class ConnectionProperties(NamedTuple):
