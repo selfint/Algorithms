@@ -1,19 +1,22 @@
-from typing import NamedTuple, List
-import numpy as np
+from typing import NamedTuple, List, Callable
 
 
 class Environments(NamedTuple):
     environments: list
 
 
-class Connections(NamedTuple):
+class ConnectionProperties(NamedTuple):
     weights: List[float]
     enabled: List[bool]
 
 
-class Nodes(NamedTuple):
-    index: int
+class NodeProperties(NamedTuple):
     biases: List[float]
+    activations: List[Callable]
+
+
+class Nodes(NamedTuple):
+    index: List[int]
 
 
 class ConnectionInnovation(NamedTuple):
