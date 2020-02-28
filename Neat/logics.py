@@ -12,7 +12,6 @@ from structs import (
     ConnectionInnovation,
     ConnectionProperties,
     Environments,
-    NodeInnovation,
     NodeProperties,
 )
 
