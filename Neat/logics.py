@@ -116,34 +116,47 @@ def evaluate_networks(
     episodes: int,
     render: bool = False,
 ) -> List[float]:
-    all_rewards = []
-    for (
-        environment,
-        network_connections,
-        network_connection_data,
-        network_node_data,
-    ) in zip(environments.environments, connections, connection_data, node_data):
-        network_rewards = []
-        for e in range(episodes):
-            print(e)
-            # reset environment
-            episode_reward = _run_episode(
-                environment,
-                max_steps,
-                network_connections,
-                network_connection_data,
-                network_node_data,
-                base_nodes,
-                render,
-            )
+    """calculate the average episode reward for each network
 
-            # log reward
-            network_rewards.append(episode_reward)
-        all_rewards.append(np.average(network_rewards))
-    return all_rewards
+    Arguments:
+        environments {Environments} -- gym environments
+        connections {List[ConnectionInnovation]} -- network connections
+        connection_data {List[ConnectionProperties]} -- network connection data
+        node_data {List[NodeProperties]} -- network node data
+        base_nodes {BaseNodes} -- input and output nodes
+        max_steps {int} -- step limit for each episode
+        episodes {int} -- number of episodes to test each network
 
+    Keyword Arguments:
+        render {bool} -- render episodes (default: {False})
 
-def _run_episode(
+    Returns:
+        List[float] -- average network rewards over n episodes
+    """
+    return [
+        np.average(
+            [
+                _get_episode_reward(
+                    environment,
+                    max_steps,
+                    network_connections,
+                    network_connection_data,
+                    network_node_data,
+                    base_nodes,
+                    render,
+                )
+                for _ in range(episodes)
+            ]
+        )
+        for (
+            environment,
+            network_connections,
+            network_connection_data,
+            network_node_data,
+        ) in zip(environments.environments, connections, connection_data, node_data)
+    ]
+
+def _get_episode_reward(
     environment: gym.Env,
     max_steps: int,
     connections: List[ConnectionInnovation],
