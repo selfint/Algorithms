@@ -6,11 +6,6 @@ class Environments(NamedTuple):
     environments: list
 
 
-class Network(NamedTuple):
-    weights: np.ndarray
-    biases: np.ndarray
-
-
 class Connections(NamedTuple):
     weights: List[float]
     enabled: List[bool]
@@ -18,7 +13,7 @@ class Connections(NamedTuple):
 
 class Nodes(NamedTuple):
     index: int
-    bias: List[float]
+    biases: List[float]
 
 
 class ConnectionInnovation(NamedTuple):
