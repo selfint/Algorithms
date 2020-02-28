@@ -40,8 +40,8 @@ def generate_temp_network():
 
 
 def test_feed_forward():
-    inputs = np.array([0.74])
     connections, connection_data, node_data, base_nodes = generate_temp_network()
+    inputs = np.random.random(size=len(base_nodes.input_nodes))
     feed_forward(inputs, connections, connection_data, node_data, base_nodes)
 
 
@@ -58,7 +58,3 @@ def test_evaluate_network():
         200,
         100
     )
-    print(rewards)
-
-
-test_evaluate_network()
