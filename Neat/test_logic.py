@@ -49,7 +49,7 @@ def test_evaluate_network():
     environments = Environments([gym.make("CartPole-v0") for _ in range(10)])
     connections, connection_data, node_data, base_nodes = generate_temp_network()
     network_amount = 10
-    rewards = evaluate_networks(
+    evaluate_networks(
         environments,
         [connections] * network_amount,
         [connection_data] * network_amount,
