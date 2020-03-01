@@ -156,6 +156,7 @@ def evaluate_networks(
         ) in zip(environments.environments, connections, connection_data, node_data)
     ]
 
+
 def _get_episode_reward(
     environment: gym.Env,
     max_steps: int,
@@ -187,6 +188,7 @@ def _get_episode_reward(
     for _ in range(max_steps):
         if render:
             environment.render()
+
         network_output = feed_forward(
             observation, connections, connection_data, node_data, base_nodes,
         )
@@ -197,5 +199,6 @@ def _get_episode_reward(
 
         if done:
             break
+
     environment.close()
     return episode_reward
