@@ -8,8 +8,10 @@ from logics import (
     ConnectionInnovation,
     ConnectionProperties,
     NodeProperties,
+    Nodes,
     feed_forward,
     evaluate_networks,
+    split_into_species,
 )
 
 
@@ -56,5 +58,38 @@ def test_evaluate_network():
         [node_data] * network_amount,
         base_nodes,
         200,
-        100
+        100,
     )
+
+
+def test_split_into_species():
+    connections, connection_data, node_data, base_nodes = generate_temp_network()
+    nodes = Nodes(
+        list(
+            range(
+                len(node_data)
+                + len(base_nodes.output_nodes)
+                + len(base_nodes.input_nodes)
+            )
+        )
+    )
+    genetic_distance_parameters = {
+        "excess_constant": 1.0,
+        "disjoint_constant": 1.0,
+        "weight_bias_constant": 1.0,
+        "large_genome_size": 20,
+        "threshold": 0.15,
+    }
+    network_amount = 10
+    species = split_into_species(
+        [connections] * network_amount,
+        [connection_data] * network_amount,
+        [node_data] * network_amount,
+        [nodes] * network_amount,
+        genetic_distance_parameters,
+    )
+    assert species == [0] * network_amount
+
+
+if __name__ == "__main__":
+    test_split_into_species()
