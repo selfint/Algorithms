@@ -1,7 +1,7 @@
 """
 Contains all logical operations to that are needed to transform the data
 """
-from typing import List
+from typing import List, Dict
 
 import numpy as np
 import gym
@@ -13,6 +13,8 @@ from structs import (
     ConnectionProperties,
     Environments,
     NodeProperties,
+    NodeInnovation,
+    Nodes,
 )
 
 
@@ -202,3 +204,89 @@ def _get_episode_reward(
 
     environment.close()
     return episode_reward
+
+
+def split_into_species(
+    connection_data: List[ConnectionProperties],
+    node_data: List[NodeProperties],
+    nodes: List[NodeInnovation],
+    genetic_distance_parameters: Dict[str, float],
+):
+    genetic_distance_threshold = genetic_distance_parameters["threshold"]
+    species = []
+    species_reps = []
+    for (network_connection_data, network_nodes, network_node_data,) in zip(
+        connection_data, node_data, nodes
+    ):
+
+        # check genetic distance to all species reps
+        for (
+            species_rep_index,
+            (rep_connection_data, rep_nodes, rep_node_data),
+        ) in enumerate(species_reps):
+            if (
+                _genetic_distance(
+                    network_connection_data,
+                    network_nodes,
+                    network_node_data,
+                    rep_connection_data,
+                    rep_nodes,
+                    rep_node_data,
+                    genetic_distance_parameters,
+                )
+                < genetic_distance_threshold
+            ):
+                species.append(species_rep_index)
+                break
+        else:
+
+            # generate a new rep for new species when a network doesn't match any
+            # other species rep
+            species.append(len(species))
+            species_reps.append(
+                (network_connection_data, network_nodes, network_node_data,)
+            )
+
+
+def _genetic_distance(
+    connection_data_a: List[ConnectionProperties],
+    node_data_a: List[NodeProperties],
+    nodes_a: Nodes,
+    connection_data_b: List[ConnectionProperties],
+    node_data_b: List[NodeProperties],
+    nodes_b: Nodes,
+    genetic_distance_parameters: Dict[str, float],
+) -> float:
+    # innovation index that splits disjoint and excess genes
+    last_common_innovation = min(max(nodes_a), max(nodes_b))
+
+    # get disjoint and excess amounts
+    # get common nodes
+    disjoint_amount = 0
+    excess_amount = 0
+    common_nodes = []
+    for a_node_index in nodes_a.index:
+        if a_node_index in nodes_b.index:
+            common_nodes.append(a_node_index)
+        if a_node_index < last_common_innovation:
+            disjoint_amount += 1
+        else:
+            excess_amount += 1
+
+    for b_node_index in nodes_b.index:
+        if b_node_index in nodes_a.index:
+            common_nodes.append(b_node_index)
+        if b_node_index < last_common_innovation:
+            disjoint_amount += 1
+        else:
+            excess_amount += 1
+
+    # get biases for common nodes to compute bias distance
+    bias_distance = sum(
+        node_data_a[nodes_a.index.index(node_index)]
+        - node_data_b[nodes_b.index.index(node_index)]
+        for node_index in common_nodes
+    )
+
+    # TODO: calc weight dif and return distance
+    raise NotImplementedError()
