@@ -265,27 +265,26 @@ def _genetic_distance(
     disjoint_amount = 0
     excess_amount = 0
     common_nodes = []
-    for a_node_index in nodes_a.index:
-        if a_node_index in nodes_b.index:
-            common_nodes.append(a_node_index)
-        if a_node_index < last_common_innovation:
+    for a_node in nodes_a.nodes:
+        if a_node in nodes_b.nodes:
+            common_nodes.append(a_node)
+        if a_node < last_common_innovation:
             disjoint_amount += 1
         else:
             excess_amount += 1
 
-    for b_node_index in nodes_b.index:
-        if b_node_index in nodes_a.index:
-            common_nodes.append(b_node_index)
-        if b_node_index < last_common_innovation:
+    for b_node in nodes_b.nodes:
+        if b_node in nodes_a.nodes:
+            common_nodes.append(b_node)
+        if b_node < last_common_innovation:
             disjoint_amount += 1
         else:
             excess_amount += 1
 
     # get biases for common nodes to compute bias distance
     bias_distance = sum(
-        node_data_a[nodes_a.index.index(node_index)]
-        - node_data_b[nodes_b.index.index(node_index)]
-        for node_index in common_nodes
+        node_data_a[nodes_a.nodes.index(node)] - node_data_b[nodes_b.nodes.index(node)]
+        for node in common_nodes
     )
 
     # TODO: calc weight dif and return distance

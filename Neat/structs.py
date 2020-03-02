@@ -19,7 +19,7 @@ class NodeProperties(NamedTuple):
 
 class Nodes(NamedTuple):
     # TODO: delete strcut, just use List[int]
-    index: List[int]
+    nodes: List[int]
 
 
 class ConnectionInnovation(NamedTuple):
