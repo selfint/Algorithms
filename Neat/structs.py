@@ -3,6 +3,7 @@ import gym
 
 
 class Environments(NamedTuple):
+    # TODO: delete strcut, just use List[gym.Env]
     environments: List[gym.Env]
 
 
@@ -17,6 +18,7 @@ class NodeProperties(NamedTuple):
 
 
 class Nodes(NamedTuple):
+    # TODO: delete strcut, just use List[int]
     index: List[int]
 
 
