@@ -212,7 +212,7 @@ def split_into_species(
     node_data: List[NodeProperties],
     nodes: List[Nodes],
     genetic_distance_parameters: Dict[str, float],
-):
+) -> List[int]:
     genetic_distance_threshold = genetic_distance_parameters["threshold"]
     species = []
     species_reps = []
@@ -271,7 +271,7 @@ def _genetic_distance(
     genetic_distance_parameters: Dict[str, float],
 ) -> float:
     # innovation index that splits disjoint and excess genes
-    last_common_innovation = min(max(nodes_a), max(nodes_b))
+    last_common_innovation = min(max(nodes_a.nodes), max(nodes_b.nodes))
 
     # get disjoint and excess amounts
     # get average bias difference
@@ -307,3 +307,25 @@ def _genetic_distance(
                 - connections_data_b[connections_b.index(a_connection)]
             )
     weight_difference = np.average(weight_differences)
+
+    # calculate genetic distance
+    c1 = genetic_distance_parameters["excess_constant"]
+    c2 = genetic_distance_parameters["disjoint_constant"]
+    c3 = genetic_distance_parameters["weight_bias_constant"]
+    large_genome_size = genetic_distance_parameters["large_genome_size"]
+    weight_bias_distance = (bias_difference + weight_difference) / 2
+    largest_genome_size = max(max(nodes_a.nodes), max(nodes_b.nodes))
+
+    # don't normalize excess and disjoint difference in small genomes
+    if largest_genome_size < large_genome_size:
+        genetic_distance = (
+            c1 * excess_amount + c2 * disjoint_amount + c3 * (weight_bias_distance)
+        )
+    else:
+        genetic_distance = (
+            c1 * excess_amount / largest_genome_size
+            + c2 * disjoint_amount / largest_genome_size
+            + c3 * (weight_bias_distance)
+        )
+
+    return genetic_distance
