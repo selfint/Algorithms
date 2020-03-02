@@ -89,7 +89,3 @@ def test_split_into_species():
         genetic_distance_parameters,
     )
     assert species == [0] * network_amount
-
-
-if __name__ == "__main__":
-    test_split_into_species()
