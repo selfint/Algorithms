@@ -219,8 +219,8 @@ def split_into_species(
     for (
         network_connections,
         network_connection_data,
-        network_nodes,
         network_node_data,
+        network_nodes,
     ) in zip(connections, connection_data, node_data, nodes):
 
         # check genetic distance to all species reps
@@ -258,6 +258,8 @@ def split_into_species(
                 )
             )
 
+    return species
+
 
 def _genetic_distance(
     connections_a: List[ConnectionInnovation],
@@ -270,6 +272,7 @@ def _genetic_distance(
     nodes_b: Nodes,
     genetic_distance_parameters: Dict[str, float],
 ) -> float:
+    # TODO: split into separate functions
     # innovation index that splits disjoint and excess genes
     last_common_innovation = min(max(nodes_a.nodes), max(nodes_b.nodes))
 
@@ -281,7 +284,7 @@ def _genetic_distance(
     for a_node, a_node_data in zip(nodes_a.nodes, node_data_a.biases):
         if a_node in nodes_b.nodes:
             bias_differences.append(
-                a_node_data - node_data_b[nodes_b.nodes.index(a_node)]
+                a_node_data - node_data_b.biases[nodes_b.nodes.index(a_node)]
             )
         elif a_node < last_common_innovation:
             disjoint_amount += 1
@@ -300,11 +303,13 @@ def _genetic_distance(
 
     # get average weight difference
     weight_differences = []
-    for a_connection, a_connection_data in zip(connections_a, connections_data_a):
+    for a_connection, a_connection_data in zip(
+        connections_a, connections_data_a.weights
+    ):
         if a_connection in connections_b:
             weight_differences.append(
                 a_connection_data
-                - connections_data_b[connections_b.index(a_connection)]
+                - connections_data_b.weights[connections_b.index(a_connection)]
             )
     weight_difference = np.average(weight_differences)
 
@@ -313,7 +318,7 @@ def _genetic_distance(
     c2 = genetic_distance_parameters["disjoint_constant"]
     c3 = genetic_distance_parameters["weight_bias_constant"]
     large_genome_size = genetic_distance_parameters["large_genome_size"]
-    weight_bias_distance = (bias_difference + weight_difference) / 2
+    weight_bias_distance = (abs(bias_difference) + abs(weight_difference)) / 2
     largest_genome_size = max(max(nodes_a.nodes), max(nodes_b.nodes))
 
     # don't normalize excess and disjoint difference in small genomes
