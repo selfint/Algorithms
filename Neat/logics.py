@@ -261,11 +261,11 @@ def split_into_species(
 
 def _genetic_distance(
     connections_a: List[ConnectionInnovation],
-    connection_data_a: ConnectionProperties,
+    connections_data_a: ConnectionProperties,
     node_data_a: NodeProperties,
     nodes_a: Nodes,
     connections_b: List[ConnectionInnovation],
-    connection_data_b: ConnectionProperties,
+    connections_data_b: ConnectionProperties,
     node_data_b: NodeProperties,
     nodes_b: Nodes,
     genetic_distance_parameters: Dict[str, float],
@@ -298,3 +298,12 @@ def _genetic_distance(
         else:
             excess_amount += 1
 
+    # get average weight difference
+    weight_differences = []
+    for a_connection, a_connection_data in zip(connections_a, connections_data_a):
+        if a_connection in connections_b:
+            weight_differences.append(
+                a_connection_data
+                - connections_data_b[connections_b.index(a_connection)]
+            )
+    weight_difference = np.average(weight_differences)
