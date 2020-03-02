@@ -21,7 +21,7 @@ from structs import (
 def feed_forward(
     inputs: np.ndarray,
     connections: List[ConnectionInnovation],
-    connection_data: List[ConnectionProperties],
+    connection_data: ConnectionProperties,
     node_data: List[NodeProperties],
     base_nodes: BaseNodes,
 ) -> np.ndarray:
@@ -110,7 +110,7 @@ def transform_network_output(network_output: List[float]) -> spaces.Discrete:
 
 def evaluate_networks(
     environments: Environments,
-    connections: List[ConnectionInnovation],
+    connections: List[List[ConnectionInnovation]],
     connection_data: List[ConnectionProperties],
     node_data: List[NodeProperties],
     base_nodes: BaseNodes,
@@ -122,7 +122,7 @@ def evaluate_networks(
 
     Arguments:
         environments {Environments} -- gym environments
-        connections {List[ConnectionInnovation]} -- network connections
+        connections {List[List[ConnectionInnovation]]} -- network connections
         connection_data {List[ConnectionProperties]} -- network connection data
         node_data {List[NodeProperties]} -- network node data
         base_nodes {BaseNodes} -- input and output nodes
@@ -163,7 +163,7 @@ def _get_episode_reward(
     environment: gym.Env,
     max_steps: int,
     connections: List[ConnectionInnovation],
-    connection_data: List[ConnectionProperties],
+    connection_data: ConnectionProperties,
     node_data: List[NodeProperties],
     base_nodes: BaseNodes,
     render: bool = False,
@@ -174,7 +174,7 @@ def _get_episode_reward(
         environment {gym.Env} -- gym environment
         max_steps {int} -- limit of steps to take in episode
         connections {List[ConnectionInnovation]} -- network connections
-        connection_data {List[ConnectionProperties]} -- network connection data
+        connection_data {ConnectionProperties} -- network connection data
         node_data {List[NodeProperties]} -- network node data
         base_nodes {BaseNodes} -- network input and output nodes
 
@@ -207,31 +207,37 @@ def _get_episode_reward(
 
 
 def split_into_species(
+    connections: List[List[ConnectionInnovation]],
     connection_data: List[ConnectionProperties],
     node_data: List[NodeProperties],
-    nodes: List[NodeInnovation],
+    nodes: List[Nodes],
     genetic_distance_parameters: Dict[str, float],
 ):
     genetic_distance_threshold = genetic_distance_parameters["threshold"]
     species = []
     species_reps = []
-    for (network_connection_data, network_nodes, network_node_data,) in zip(
-        connection_data, node_data, nodes
-    ):
+    for (
+        network_connections,
+        network_connection_data,
+        network_nodes,
+        network_node_data,
+    ) in zip(connections, connection_data, node_data, nodes):
 
         # check genetic distance to all species reps
         for (
             species_rep_index,
-            (rep_connection_data, rep_nodes, rep_node_data),
+            (rep_connections, rep_connection_data, rep_nodes, rep_node_data),
         ) in enumerate(species_reps):
             if (
                 _genetic_distance(
+                    network_connections,
                     network_connection_data,
-                    network_nodes,
                     network_node_data,
+                    network_nodes,
+                    rep_connections,
                     rep_connection_data,
-                    rep_nodes,
                     rep_node_data,
+                    rep_nodes,
                     genetic_distance_parameters,
                 )
                 < genetic_distance_threshold
@@ -244,16 +250,23 @@ def split_into_species(
             # other species rep
             species.append(len(species))
             species_reps.append(
-                (network_connection_data, network_nodes, network_node_data,)
+                (
+                    network_connections,
+                    network_connection_data,
+                    network_nodes,
+                    network_node_data,
+                )
             )
 
 
 def _genetic_distance(
-    connection_data_a: List[ConnectionProperties],
-    node_data_a: List[NodeProperties],
+    connections_a: List[ConnectionInnovation],
+    connection_data_a: ConnectionProperties,
+    node_data_a: NodeProperties,
     nodes_a: Nodes,
-    connection_data_b: List[ConnectionProperties],
-    node_data_b: List[NodeProperties],
+    connections_b: List[ConnectionInnovation],
+    connection_data_b: ConnectionProperties,
+    node_data_b: NodeProperties,
     nodes_b: Nodes,
     genetic_distance_parameters: Dict[str, float],
 ) -> float:
@@ -261,17 +274,20 @@ def _genetic_distance(
     last_common_innovation = min(max(nodes_a), max(nodes_b))
 
     # get disjoint and excess amounts
-    # get common nodes
+    # get bias difference average
     disjoint_amount = 0
     excess_amount = 0
-    common_nodes = []
-    for a_node in nodes_a.nodes:
+    bias_differences = []
+    for a_node, a_node_data in zip(nodes_a.nodes, node_data_a.biases):
         if a_node in nodes_b.nodes:
-            common_nodes.append(a_node)
+            bias_differences.append(
+                a_node_data - node_data_b[nodes_b.nodes.index(a_node)]
+            )
         elif a_node < last_common_innovation:
             disjoint_amount += 1
         else:
             excess_amount += 1
+    bias_difference = np.average(bias_differences)
 
     for b_node in nodes_b.nodes:
         if b_node in nodes_a.nodes:
@@ -282,11 +298,3 @@ def _genetic_distance(
         else:
             excess_amount += 1
 
-    # get biases for common nodes to compute bias distance
-    bias_distance = sum(
-        node_data_a[nodes_a.nodes.index(node)] - node_data_b[nodes_b.nodes.index(node)]
-        for node in common_nodes
-    )
-
-    # TODO: calc weight dif and return distance
-    raise NotImplementedError()
