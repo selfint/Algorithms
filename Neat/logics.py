@@ -274,7 +274,7 @@ def _genetic_distance(
     last_common_innovation = min(max(nodes_a), max(nodes_b))
 
     # get disjoint and excess amounts
-    # get bias difference average
+    # get average bias difference
     disjoint_amount = 0
     excess_amount = 0
     bias_differences = []
