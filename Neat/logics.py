@@ -277,7 +277,7 @@ def _genetic_distance(
         if b_node in nodes_a.nodes:
             # matching nodes were all found when iterating through nodes_a
             continue
-        elif b_node < last_common_innovation:
+        if b_node < last_common_innovation:
             disjoint_amount += 1
         else:
             excess_amount += 1
