@@ -121,9 +121,9 @@ def evaluate_networks(
 
     Arguments:
         environments {Environments} -- gym environments
-        connections {List[List[ConnectionInnovation]]} -- network connections
-        connection_data {List[ConnectionProperties]} -- network connection data
-        node_data {List[NodeProperties]} -- network node data
+        networks_connections {List[List[ConnectionInnovation]]} -- network connections
+        networks_connection_data {List[ConnectionProperties]} -- network connection data
+        networks_node_data {List[NodeProperties]} -- network node data
         base_nodes {BaseNodes} -- input and output nodes
         max_steps {int} -- step limit for each episode
         episodes {int} -- number of episodes to test each network
