@@ -103,7 +103,7 @@ def _get_node_output(
     )
 
 
-def transform_network_output(network_output: List[float]) -> spaces.Discrete:
+def transform_network_output_discrete(network_output: List[float]) -> spaces.Discrete:
     return np.argmax(network_output)
 
 
@@ -198,7 +198,7 @@ def _get_episode_reward(
         network_output = feed_forward(
             observation, connections, connection_data, node_data, base_nodes,
         )
-        action = transform_network_output(network_output)
+        action = transform_network_output_discrete(network_output)
         observation, reward, done, _ = environment.step(action)
 
         episode_reward += reward
