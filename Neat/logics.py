@@ -21,7 +21,7 @@ def feed_forward(
     inputs: np.ndarray,
     connections: List[ConnectionInnovation],
     connection_data: ConnectionProperties,
-    node_data: List[NodeProperties],
+    node_data: NodeProperties,
     base_nodes: BaseNodes,
 ) -> np.ndarray:
     """Calculate the output of a network using recursion
@@ -121,9 +121,9 @@ def evaluate_networks(
 
     Arguments:
         environments {Environments} -- gym environments
-        networks_connections {List[List[ConnectionInnovation]]} -- network connections
-        networks_connection_data {List[ConnectionProperties]} -- network connection data
-        networks_node_data {List[NodeProperties]} -- network node data
+        networks_connections {List[List[ConnectionInnovation]]} -- networks connections
+        networks_connection_data {List[ConnectionProperties]} -- networks connection data
+        networks_node_data {List[NodeProperties]} -- networks node data
         base_nodes {BaseNodes} -- input and output nodes
         max_steps {int} -- step limit for each episode
         episodes {int} -- number of episodes to test each network
@@ -168,7 +168,7 @@ def _get_episode_reward(
     max_steps: int,
     connections: List[ConnectionInnovation],
     connection_data: ConnectionProperties,
-    node_data: List[NodeProperties],
+    node_data: NodeProperties,
     base_nodes: BaseNodes,
     render: bool = False,
 ) -> float:
@@ -179,7 +179,7 @@ def _get_episode_reward(
         max_steps {int} -- limit of steps to take in episode
         connections {List[ConnectionInnovation]} -- network connections
         connection_data {ConnectionProperties} -- network connection data
-        node_data {List[NodeProperties]} -- network node data
+        node_data {NodeProperties} -- network node data
         base_nodes {BaseNodes} -- network input and output nodes
 
     Returns:
