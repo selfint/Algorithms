@@ -1,7 +1,7 @@
 """
 Contains all logical operations to that are needed to transform the data
 """
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import numpy as np
 import gym
@@ -375,3 +375,69 @@ def _genetic_distance(
         )
 
     return genetic_distance
+
+
+def new_generation(
+    networks_connections: List[List[ConnectionInnovation]],
+    networks_connection_data: List[ConnectionProperties],
+    networks_node_data: List[NodeProperties],
+    networks_nodes: List[Nodes],
+    networks_scores: List[float],
+    networks_species: List[int],
+    genetic_distance_parameters: Dict[str, float],
+) -> Tuple[
+    List[List[ConnectionInnovation]],
+    List[ConnectionProperties],
+    List[NodeProperties],
+    List[Nodes],
+]:
+    """creates a new generation of networks based on the previous network's scores
+
+    Arguments:
+        networks_connections {List[List[ConnectionInnovation]]} -- connections of each network
+        networks_connection_data {List[ConnectionProperties]} -- data of connections of each network
+        networks_node_data {List[NodeProperties]} -- data of nodes of each network
+        networks_nodes {List[Nodes]} -- nodes of each network
+        networks_species {List[int]} -- species of each network
+        networks_scores {List[float]} -- scores of each networks from their environments
+        genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
+
+    Returns:
+        Tuple[List[List[ConnectionInnovation]],List[ConnectionProperties],
+              List[NodeProperties],List[Nodes],] -- new generation
+    """
+
+    # normalize scores using species fitness sharing
+    normalized_scores = _normalize_scores(networks_scores, networks_species)
+
+    raise NotImplementedError()
+
+
+def _normalize_scores(
+    networks_scores: List[float], networks_species: List[int]
+) -> List[float]:
+    """normalize scores using species fitness sharing
+
+    Arguments:
+        networks_species {List[int]} -- species of each network
+        networks_scores {List[float]} -- scores of each networks from their environments
+
+    Returns:
+        List[float] -- normalized scores
+    """
+
+    # species amount is sorted, so each index is the amount of networks in that species
+    species_amount = np.unique(networks_species, return_counts=True)[1]
+
+    # normalize scores for each species
+    normalized_scores = np.array(
+        [
+            network_score / species_amount[network_species]
+            for network_score, network_species in zip(networks_scores, networks_species)
+        ]
+    )
+
+    # set scores to add up to 1 as they will be used as probabilities later
+    normalized_scores = normalized_scores / np.sum(normalized_scores)
+
+    return normalized_scores
