@@ -399,7 +399,7 @@ def new_generation(
             new_network_connection_weights,
             new_network_connection_states,
             network_nodes,
-        ) = _crossover_connections(
+        ) = _crossover(
             networks_nodes[parent_a],
             networks_connections[parent_a],
             networks_connection_weights[parent_a],
@@ -423,7 +423,7 @@ def new_generation(
     )
 
 
-def _crossover_connections(
+def _crossover(
     network_a_nodes: Nodes,
     network_a_connections: List[ConnectionInnovation],
     network_a_connection_weights: ConnectionWeights,
