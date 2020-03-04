@@ -30,7 +30,8 @@ def feed_forward(
     Arguments:
         inputs {np.ndarray} -- network inputs
         connections {List[ConnectionInnovation]} -- connections between nodes
-        connection_data {ConnectionProperties} -- connection weights and biases
+        connections_weights: {ConnectionWeights} -- connection weights
+        connections_states: {ConnectionStates} -- connection states
         base_nodes {BaseNodes} -- input and output nodes
 
     Returns:
@@ -72,7 +73,8 @@ def _get_node_output(
         node_id {int} -- index of node to get output of
         inputs {np.ndarray} -- network inputs
         connections {List[ConnectionInnovation]} -- connections between nodes
-        connection_data {ConnectionProperties} -- connection weights and biases
+        connections_weights: {ConnectionWeights} -- connection weights
+        connections_states: {ConnectionStates} -- connection states
         base_nodes {BaseNodes} -- input and output nodes
         ignore_connections {List[ConnectionInnovation]} -- connections previously
                                                            calculated
