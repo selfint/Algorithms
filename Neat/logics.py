@@ -410,6 +410,8 @@ def new_generation(
     # normalize scores using species fitness sharing
     normalized_scores = _normalize_scores(networks_scores, networks_species)
 
+    #
+
     raise NotImplementedError()
 
 
@@ -426,7 +428,8 @@ def _normalize_scores(
         List[float] -- normalized scores
     """
 
-    # species amount is sorted, so each index is the amount of networks in that species
+    # species amount is sorted, so each index (of species_amount) is the
+    # amount of networks in that species
     species_amount = np.unique(networks_species, return_counts=True)[1]
 
     # normalize scores for each species
