@@ -458,7 +458,14 @@ def _crossover_connections(
     network_b_connections_data: ConnectionProperties,
     genetic_distance_parameters: Dict[str, float],
 ) -> Tuple[List[ConnectionInnovation], ConnectionProperties]:
-    raise NotImplementedError()
+    new_network_connections = []
+    new_network_connections_weights = []
+    new_network_connections_enabled = []
+
+    new_network_connections_data = ConnectionProperties(
+        new_network_connections_weights, new_network_connections_enabled
+    )
+    return new_network_connections, new_network_connections_data
 
 
 def _crossover_nodes(
