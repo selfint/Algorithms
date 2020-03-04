@@ -12,11 +12,6 @@ class ConnectionProperties(NamedTuple):
     enabled: List[bool]
 
 
-class NodeProperties(NamedTuple):
-    biases: List[float]
-    activations: List[Callable]
-
-
 class Nodes(NamedTuple):
     # TODO: delete strcut, just use List[int]
     nodes: List[int]
