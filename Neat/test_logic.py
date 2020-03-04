@@ -7,7 +7,6 @@ from logics import (
     BaseNodes,
     ConnectionInnovation,
     ConnectionProperties,
-    Nodes,
     feed_forward,
     evaluate_networks,
     split_into_species,
