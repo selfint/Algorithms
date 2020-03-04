@@ -424,7 +424,7 @@ def new_generation(
     # using crossover and mutation
     for _ in range(networks_amount):
         parent_a, parent_b = np.random.choice(networks, size=2, p=normalized_scores)
-        network_connections, network_connection_data = _crossover_connections(
+        new_network_connections, new_network_connection_data = _crossover_connections(
             networks_connections[parent_a],
             networks_connections_data[parent_a],
             networks_connections[parent_b],
@@ -436,10 +436,11 @@ def new_generation(
             networks_node_data[parent_a],
             networks_nodes[parent_b],
             networks_node_data[parent_b],
+            new_network_connections,
             genetic_distance_parameters,
         )
-        new_networks_connections.append(network_connections)
-        new_networks_connection_data.append(network_connection_data)
+        new_networks_connections.append(new_network_connections)
+        new_networks_connection_data.append(new_network_connection_data)
         new_networks_node_data.append(network_node_data)
         new_networks_nodes.append(network_nodes)
 
@@ -462,6 +463,14 @@ def _crossover_connections(
     new_network_connections_weights = []
     new_network_connections_enabled = []
 
+    # get common connections
+    for a_connection, a_connection_data in zip(
+        network_a_connections, network_a_connections_data
+    ):
+        # if connection is matching the child inherits it
+        if a_connection in network_b_connections:
+            new_network_connections.append(a_connection)
+
     new_network_connections_data = ConnectionProperties(
         new_network_connections_weights, new_network_connections_enabled
     )
@@ -473,6 +482,7 @@ def _crossover_nodes(
     network_a_nodes_data: NodeProperties,
     network_b_nodes: Nodes,
     network_b_nodes_data: NodeProperties,
+    new_network_connections: List[ConnectionInnovation],
     genetic_distance_parameters: Dict[str, float],
 ) -> Tuple[Nodes, NodeProperties]:
     raise NotImplementedError()
