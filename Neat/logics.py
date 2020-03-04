@@ -9,7 +9,7 @@ from gym import spaces
 
 from structs import (
     BaseNodes,
-    ConnectionInnovation,
+    ConnectionDirections,
     ConnectionWeights,
     ConnectionStates,
     ConnectionDirections,
@@ -20,7 +20,7 @@ from structs import (
 
 def feed_forward(
     inputs: np.ndarray,
-    connections: List[ConnectionInnovation],
+    connections: ConnectionDirections,
     connections_weights: ConnectionWeights,
     connections_states: ConnectionStates,
     base_nodes: BaseNodes,
@@ -29,7 +29,7 @@ def feed_forward(
 
     Arguments:
         inputs {np.ndarray} -- network inputs
-        connections {List[ConnectionInnovation]} -- connections between nodes
+        connections {ConnectionDirections} -- connections between nodes
         connections_weights: {ConnectionWeights} -- connection weights
         connections_states: {ConnectionStates} -- connection states
         base_nodes {BaseNodes} -- input and output nodes
@@ -61,22 +61,22 @@ def _activation_function(x: float) -> float:
 def _get_node_output(
     node_id: int,
     inputs: np.ndarray,
-    connections: List[ConnectionInnovation],
+    connections: ConnectionDirections,
     connection_weights: ConnectionWeights,
     connection_states: ConnectionStates,
     base_nodes: BaseNodes,
-    ignore_connections: List[ConnectionInnovation],
+    ignore_connections: List[Tuple[int, int]],
 ) -> float:
     """helper function to get output of a single node using recursion
 
     Arguments:
         node_id {int} -- index of node to get output of
         inputs {np.ndarray} -- network inputs
-        connections {List[ConnectionInnovation]} -- connections between nodes
+        connections {ConnectionDirections} -- connections between nodes
         connections_weights: {ConnectionWeights} -- connection weights
         connections_states: {ConnectionStates} -- connection states
         base_nodes {BaseNodes} -- input and output nodes
-        ignore_connections {List[ConnectionInnovation]} -- connections previously
+        ignore_connections {ConnectionDirections} -- connections previously
                                                            calculated
 
     Returns:
@@ -96,21 +96,27 @@ def _get_node_output(
         np.sum(  # weighted sum of the outputs of all nodes outputing into node
             [
                 _get_node_output(
-                    connection.src,
+                    connection_src,
                     inputs,
                     connections,
                     connection_weights,
                     connection_states,
                     base_nodes,
-                    ignore_connections + [connection],  # mark connection as to-ignore
+                    ignore_connections
+                    + [
+                        (connection_src, connection_dst,)
+                    ],  # mark connection as to-ignore
                 )
                 * connection_weight  # weight the output
-                for connection, connection_weight, connection_state in zip(
+                for (
+                    connection_src,
+                    connection_dst,
+                ), connection_weight, connection_state in zip(
                     connections, connection_weights, connection_states,
                 )
                 if (
-                    connection.dst == node_id  # get connections outputing into node
-                    and connection
+                    connection_dst == node_id  # get connections outputing into node
+                    and (connection_src, connection_dst,)
                     not in ignore_connections  # ignore accounted for connections
                     and connection_state  # ignore disabled connections
                 )
@@ -125,7 +131,7 @@ def transform_network_output_discrete(network_output: List[float]) -> spaces.Dis
 
 def evaluate_networks(
     environments: Environments,
-    networks_connections: List[List[ConnectionInnovation]],
+    networks_connections: List[ConnectionDirections],
     networks_connection_weights: List[ConnectionWeights],
     networks_connection_states: List[ConnectionStates],
     base_nodes: BaseNodes,
@@ -137,7 +143,7 @@ def evaluate_networks(
 
     Arguments:
         environments {Environments} -- gym environments
-        networks_connections {List[List[ConnectionInnovation]]} -- networks connections
+        networks_connections {List[ConnectionDirections]} -- networks connections
         networks_connection_data {List[ConnectionProperties]} -- networks connection data
         base_nodes {BaseNodes} -- input and output nodes
         max_steps {int} -- step limit for each episode
@@ -181,7 +187,7 @@ def evaluate_networks(
 def _get_episode_reward(
     environment: gym.Env,
     max_steps: int,
-    connections: List[ConnectionInnovation],
+    connections: ConnectionDirections,
     connections_weights: ConnectionWeights,
     connections_states: ConnectionStates,
     base_nodes: BaseNodes,
@@ -192,7 +198,7 @@ def _get_episode_reward(
     Arguments:
         environment {gym.Env} -- gym environment
         max_steps {int} -- limit of steps to take in episode
-        connections {List[ConnectionInnovation]} -- network connections
+        connections {ConnectionDirections} -- network connections
         connection_data {ConnectionProperties} -- network connection data
         base_nodes {BaseNodes} -- network input and output nodes
 
@@ -229,14 +235,14 @@ def _get_episode_reward(
 
 
 def split_into_species(
-    networks_connections: List[List[ConnectionInnovation]],
+    networks_connections: List[ConnectionDirections],
     networks_connection_weights: List[ConnectionWeights],
     genetic_distance_parameters: Dict[str, float],
 ) -> List[int]:
     """assign a species to each network
 
     Arguments:
-        networks_connections {List[List[ConnectionInnovation]]} -- connections of each network
+        networks_connections {List[ConnectionDirections]} -- connections of each network
         networks_connection_data {List[ConnectionProperties]} -- data of connections of each network
         networks_nodes {List[Nodes]} -- nodes of each network
         genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
@@ -278,19 +284,19 @@ def split_into_species(
 
 
 def _genetic_distance(
-    network_a_connections: List[ConnectionInnovation],
+    network_a_connections: ConnectionDirections,
     network_a_connection_weights: ConnectionWeights,
-    network_b_connections: List[ConnectionInnovation],
+    network_b_connections: ConnectionDirections,
     network_b_connection_weights: ConnectionWeights,
     genetic_distance_parameters: Dict[str, float],
 ) -> float:
     """calculate the genetic distance between two networks
 
     Arguments:
-        network_a_connections {List[List[ConnectionInnovation]]} -- connections of network a
+        network_a_connections {List[ConnectionDirections]} -- connections of network a
         network_a_connections_data {List[ConnectionProperties]} -- data of connections of network a
         network_a_nodes {List[Nodes]} -- nodes of network a
-        network_b_connections {List[List[ConnectionInnovation]]} -- connections of network b
+        network_b_connections {List[ConnectionDirections]} -- connections of network b
         network_b_connections_data {List[ConnectionProperties]} -- data of connections of network b
         network_b_nodes {List[Nodes]} -- nodes of network b
         genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
@@ -308,7 +314,21 @@ def _genetic_distance(
     # get average weight difference
     disjoint_amount = 0
     excess_amount = 0
-    weight_differences = []
+    weight_differences = (
+        network_a_connection_weights.weights[
+            np.where(
+                network_a_connection_weights.weights
+                in network_b_connection_weights.weights
+            )
+        ]
+        - network_b_connection_weights.weights[
+            np.where(
+                network_b_connection_weights.weights
+                in network_a_connection_weights.weights
+            )
+        ]
+    )
+    print(weight_differences)
 
     for a_connection, a_connection_weight in zip(
         network_a_connections, network_a_connection_weights
@@ -348,7 +368,7 @@ def _genetic_distance(
 
 
 def new_generation(
-    networks_connections: List[List[ConnectionInnovation]],
+    networks_connections: List[ConnectionDirections],
     networks_connection_weights: List[ConnectionWeights],
     networks_connection_states: List[ConnectionStates],
     networks_nodes: List[Nodes],
@@ -356,7 +376,7 @@ def new_generation(
     networks_species: List[int],
     genetic_distance_parameters: Dict[str, float],
 ) -> Tuple[
-    List[List[ConnectionInnovation]],
+    List[ConnectionDirections],
     List[ConnectionWeights],
     List[ConnectionStates],
     List[Nodes],
@@ -364,7 +384,7 @@ def new_generation(
     """creates a new generation of networks based on the previous network's scores
 
     Arguments:
-        networks_connections {List[List[ConnectionInnovation]]} -- connections of each network
+        networks_connections {List[ConnectionDirections]} -- connections of each network
         networks_connection_data {List[ConnectionProperties]} -- data of connections of each network
         networks_nodes {List[Nodes]} -- nodes of each network
         networks_species {List[int]} -- species of each network
@@ -372,7 +392,7 @@ def new_generation(
         genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
 
     Returns:
-        Tuple[List[List[ConnectionInnovation]],List[ConnectionProperties],
+        Tuple[List[ConnectionDirections],List[ConnectionProperties],
               List[Nodes],] -- new generation
     """
 
@@ -425,15 +445,15 @@ def new_generation(
 
 def _crossover(
     network_a_nodes: Nodes,
-    network_a_connections: List[ConnectionInnovation],
+    network_a_connections: ConnectionDirections,
     network_a_connection_weights: ConnectionWeights,
     network_a_connection_states: ConnectionStates,
     network_b_nodes: Nodes,
-    network_b_connections: List[ConnectionInnovation],
+    network_b_connections: ConnectionDirections,
     network_b_connection_weights: ConnectionWeights,
     network_b_connection_states: ConnectionStates,
     genetic_distance_parameters: Dict[str, float],
-) -> Tuple[List[ConnectionInnovation], ConnectionWeights, ConnectionStates, Nodes]:
+) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates, Nodes]:
     new_network_connections = []
     new_network_connections_weights = []
     new_network_connections_enabled = []

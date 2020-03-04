@@ -1,6 +1,7 @@
-from typing import List, NamedTuple, Iterator
+from typing import Iterator, List, NamedTuple
 
 import gym
+import numpy as np
 
 
 class Environments(NamedTuple):
@@ -9,27 +10,29 @@ class Environments(NamedTuple):
 
 
 class ConnectionWeights(NamedTuple):
-    weights: List[float]
+    weights: np.ndarray
 
     def __iter__(self) -> Iterator[float]:
         return iter(self.weights)
 
 
 class ConnectionStates(NamedTuple):
-    states: List[bool]
+    states: np.ndarray
 
-    def __iter__(self) -> Iterator[bool]:
+    def __iter__(self) -> Iterator[int]:
         return iter(self.states)
 
 
 class Nodes(NamedTuple):
-    # TODO: delete strcut, just use List[int]
-    nodes: List[int]
+    nodes: np.ndarray
 
 
-class ConnectionInnovation(NamedTuple):
-    src: int
-    dst: int
+class ConnectionDirections(NamedTuple):
+    directions: np.ndarray
+
+
+class ConnectionInnovations(NamedTuple):
+    innovations: np.ndarray
 
 
 class NodeInnovation(NamedTuple):

@@ -5,7 +5,7 @@ import gym
 from logics import (
     Environments,
     BaseNodes,
-    ConnectionInnovation,
+    ConnectionDirections,
     ConnectionWeights,
     ConnectionStates,
     feed_forward,
@@ -15,26 +15,31 @@ from logics import (
 
 
 def generate_temp_network():
-    connections = [
-        ConnectionInnovation(0, 6),
-        ConnectionInnovation(1, 6),
-        ConnectionInnovation(2, 6),
-        ConnectionInnovation(3, 6),
-        ConnectionInnovation(0, 7),
-        ConnectionInnovation(1, 7),
-        ConnectionInnovation(2, 7),
-        ConnectionInnovation(3, 7),
-        ConnectionInnovation(7, 4),
-        ConnectionInnovation(7, 5),
-        ConnectionInnovation(8, 4),
-        ConnectionInnovation(8, 5),
-    ]
-    connection_weights = ConnectionWeights(np.random.random(size=11))
+    connection_directions = np.array(
+        [
+            [-1, 6],
+            [0, 6],
+            [1, 6],
+            [2, 6],
+            [3, 6],
+            [-1, 7],
+            [0, 7],
+            [1, 7],
+            [2, 7],
+            [3, 7],
+            [-1, 4],
+            [7, 4],
+            [7, 5],
+            [8, 4],
+            [8, 5],
+        ]
+    )
+    connection_weights = ConnectionWeights(np.random.random(connection_directions.size))
     connection_states = ConnectionStates(
-        [True, True, True, True, False, True, True, True, True, True, True],
+        np.random.randint(2, size=connection_directions.size)
     )
     base_nodes = BaseNodes([0, 1, 2, 3], [4, 5])
-    return connections, connection_weights, connection_states, base_nodes
+    return connection_directions, connection_weights, connection_states, base_nodes
 
 
 def test_feed_forward():
@@ -87,3 +92,6 @@ def test_split_into_species():
         genetic_distance_parameters,
     )
     assert species == [0] * network_amount
+
+
+print(test_split_into_species())
