@@ -6,7 +6,8 @@ from logics import (
     Environments,
     BaseNodes,
     ConnectionInnovation,
-    ConnectionProperties,
+    ConnectionWeights,
+    ConnectionStates,
     feed_forward,
     evaluate_networks,
     split_into_species,
@@ -28,28 +29,42 @@ def generate_temp_network():
         ConnectionInnovation(8, 4),
         ConnectionInnovation(8, 5),
     ]
-    connection_data = ConnectionProperties(
-        np.random.random(size=11),
+    connection_weights = ConnectionWeights(np.random.random(size=11))
+    connection_states = ConnectionStates(
         [True, True, True, True, False, True, True, True, True, True, True],
     )
     base_nodes = BaseNodes([0, 1, 2, 3], [4, 5])
-    return connections, connection_data, base_nodes
+    return connections, connection_weights, connection_states, base_nodes
 
 
 def test_feed_forward():
-    connections, connection_data, base_nodes = generate_temp_network()
+    (
+        connections,
+        connection_weights,
+        connection_states,
+        base_nodes,
+    ) = generate_temp_network()
     inputs = np.random.random(size=len(base_nodes.input_nodes))
-    assert np.sum(feed_forward(inputs, connections, connection_data, base_nodes)) > 0
+    result = feed_forward(
+        inputs, connections, connection_weights, connection_states, base_nodes
+    )
+    assert np.sum(result) > 0
 
 
 def test_evaluate_network():
     environments = Environments([gym.make("CartPole-v0") for _ in range(10)])
-    connections, connection_data, base_nodes = generate_temp_network()
+    (
+        connections,
+        connection_weights,
+        connection_states,
+        base_nodes,
+    ) = generate_temp_network()
     network_amount = 10
     evaluate_networks(
         environments,
         [connections] * network_amount,
-        [connection_data] * network_amount,
+        [connection_weights] * network_amount,
+        [connection_states] * network_amount,
         base_nodes,
         200,
         100,
@@ -57,7 +72,7 @@ def test_evaluate_network():
 
 
 def test_split_into_species():
-    connections, connection_data, _ = generate_temp_network()
+    connections, connection_weights, _, _ = generate_temp_network()
     genetic_distance_parameters = {
         "excess_constant": 1.0,
         "disjoint_constant": 1.0,
@@ -68,7 +83,7 @@ def test_split_into_species():
     network_amount = 10
     species = split_into_species(
         [connections] * network_amount,
-        [connection_data] * network_amount,
+        [connection_weights] * network_amount,
         genetic_distance_parameters,
     )
     assert species == [0] * network_amount

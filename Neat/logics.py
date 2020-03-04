@@ -10,7 +10,9 @@ from gym import spaces
 from structs import (
     BaseNodes,
     ConnectionInnovation,
-    ConnectionProperties,
+    ConnectionWeights,
+    ConnectionStates,
+    ConnectionDirections,
     Environments,
     Nodes,
 )
@@ -19,7 +21,8 @@ from structs import (
 def feed_forward(
     inputs: np.ndarray,
     connections: List[ConnectionInnovation],
-    connection_data: ConnectionProperties,
+    connections_weights: ConnectionWeights,
+    connections_states: ConnectionStates,
     base_nodes: BaseNodes,
 ) -> np.ndarray:
     """Calculate the output of a network using recursion
@@ -28,7 +31,6 @@ def feed_forward(
         inputs {np.ndarray} -- network inputs
         connections {List[ConnectionInnovation]} -- connections between nodes
         connection_data {ConnectionProperties} -- connection weights and biases
-        node_data {NodeProperties} -- node biases
         base_nodes {BaseNodes} -- input and output nodes
 
     Returns:
@@ -36,9 +38,15 @@ def feed_forward(
     """
     return [
         _get_node_output(
-            node_index, inputs, connections, connection_data, base_nodes, []
+            node_id,
+            inputs,
+            connections,
+            connections_weights,
+            connections_states,
+            base_nodes,
+            ignore_connections=[],
         )
-        for node_index in base_nodes.output_nodes
+        for node_id in base_nodes.output_nodes
     ]
 
 
@@ -50,21 +58,21 @@ def _activation_function(x: float) -> float:
 
 
 def _get_node_output(
-    node_index: int,
+    node_id: int,
     inputs: np.ndarray,
     connections: List[ConnectionInnovation],
-    connection_data: ConnectionProperties,
+    connection_weights: ConnectionWeights,
+    connection_states: ConnectionStates,
     base_nodes: BaseNodes,
     ignore_connections: List[ConnectionInnovation],
 ) -> float:
     """helper function to get output of a single node using recursion
 
     Arguments:
-        node_index {int} -- index of node to get output of
+        node_id {int} -- index of node to get output of
         inputs {np.ndarray} -- network inputs
         connections {List[ConnectionInnovation]} -- connections between nodes
         connection_data {ConnectionProperties} -- connection weights and biases
-        node_data {NodeProperties} -- node biases
         base_nodes {BaseNodes} -- input and output nodes
         ignore_connections {List[ConnectionInnovation]} -- connections previously
                                                            calculated
@@ -73,11 +81,11 @@ def _get_node_output(
         float -- output of node
     """
     # input nodes are just placeholders for the network input
-    if node_index in base_nodes.input_nodes:
-        return inputs[node_index]
+    if node_id in base_nodes.input_nodes:
+        return inputs[node_id]
 
     # the output of the bias node is always 1
-    if node_index == base_nodes.bias_node:
+    if node_id == base_nodes.bias_node:
         return 1.0
 
     # since input nodes don't have properties, the node_properties_index is offset by
@@ -89,19 +97,20 @@ def _get_node_output(
                     connection.src,
                     inputs,
                     connections,
-                    connection_data,
+                    connection_weights,
+                    connection_states,
                     base_nodes,
                     ignore_connections + [connection],  # mark connection as to-ignore
                 )
                 * connection_weight  # weight the output
-                for connection, connection_weight, connection_enabled in zip(
-                    connections, connection_data.weights, connection_data.enabled
+                for connection, connection_weight, connection_state in zip(
+                    connections, connection_weights, connection_states,
                 )
                 if (
-                    connection.dst == node_index  # get connections outputing into node
+                    connection.dst == node_id  # get connections outputing into node
                     and connection
                     not in ignore_connections  # ignore accounted for connections
-                    and connection_enabled  # ignore disabled connections
+                    and connection_state  # ignore disabled connections
                 )
             ]
         )
@@ -115,7 +124,8 @@ def transform_network_output_discrete(network_output: List[float]) -> spaces.Dis
 def evaluate_networks(
     environments: Environments,
     networks_connections: List[List[ConnectionInnovation]],
-    networks_connection_data: List[ConnectionProperties],
+    networks_connection_weights: List[ConnectionWeights],
+    networks_connection_states: List[ConnectionStates],
     base_nodes: BaseNodes,
     max_steps: int,
     episodes: int,
@@ -127,7 +137,6 @@ def evaluate_networks(
         environments {Environments} -- gym environments
         networks_connections {List[List[ConnectionInnovation]]} -- networks connections
         networks_connection_data {List[ConnectionProperties]} -- networks connection data
-        networks_node_data {List[NodeProperties]} -- networks node data
         base_nodes {BaseNodes} -- input and output nodes
         max_steps {int} -- step limit for each episode
         episodes {int} -- number of episodes to test each network
@@ -145,15 +154,24 @@ def evaluate_networks(
                     environment,
                     max_steps,
                     network_connections,
-                    network_connection_data,
+                    network_connection_weights,
+                    network_connection_states,
                     base_nodes,
                     render,
                 )
                 for _ in range(episodes)
             ]
         )
-        for (environment, network_connections, network_connection_data,) in zip(
-            environments.environments, networks_connections, networks_connection_data,
+        for (
+            environment,
+            network_connections,
+            network_connection_weights,
+            network_connection_states,
+        ) in zip(
+            environments.environments,
+            networks_connections,
+            networks_connection_weights,
+            networks_connection_states,
         )
     ]
 
@@ -162,7 +180,8 @@ def _get_episode_reward(
     environment: gym.Env,
     max_steps: int,
     connections: List[ConnectionInnovation],
-    connection_data: ConnectionProperties,
+    connections_weights: ConnectionWeights,
+    connections_states: ConnectionStates,
     base_nodes: BaseNodes,
     render: bool = False,
 ) -> float:
@@ -173,7 +192,6 @@ def _get_episode_reward(
         max_steps {int} -- limit of steps to take in episode
         connections {List[ConnectionInnovation]} -- network connections
         connection_data {ConnectionProperties} -- network connection data
-        node_data {NodeProperties} -- network node data
         base_nodes {BaseNodes} -- network input and output nodes
 
     Returns:
@@ -190,7 +208,11 @@ def _get_episode_reward(
             environment.render()
 
         network_output = feed_forward(
-            observation, connections, connection_data, base_nodes,
+            observation,
+            connections,
+            connections_weights,
+            connections_states,
+            base_nodes,
         )
         action = transform_network_output_discrete(network_output)
         observation, reward, done, _ = environment.step(action)
@@ -206,7 +228,7 @@ def _get_episode_reward(
 
 def split_into_species(
     networks_connections: List[List[ConnectionInnovation]],
-    networks_connection_data: List[ConnectionProperties],
+    networks_connection_weights: List[ConnectionWeights],
     genetic_distance_parameters: Dict[str, float],
 ) -> List[int]:
     """assign a species to each network
@@ -214,7 +236,6 @@ def split_into_species(
     Arguments:
         networks_connections {List[List[ConnectionInnovation]]} -- connections of each network
         networks_connection_data {List[ConnectionProperties]} -- data of connections of each network
-        networks_node_data {List[NodeProperties]} -- data of nodes of each network
         networks_nodes {List[Nodes]} -- nodes of each network
         genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
 
@@ -224,8 +245,8 @@ def split_into_species(
     genetic_distance_threshold = genetic_distance_parameters["threshold"]
     species = []
     species_reps = []
-    for (network_connections, network_connection_data,) in zip(
-        networks_connections, networks_connection_data,
+    for (network_connections, network_connection_weights,) in zip(
+        networks_connections, networks_connection_weights,
     ):
 
         # check genetic distance to all species reps
@@ -235,7 +256,7 @@ def split_into_species(
             if (
                 _genetic_distance(
                     network_connections,
-                    network_connection_data,
+                    network_connection_weights,
                     rep_connections,
                     rep_connection_data,
                     genetic_distance_parameters,
@@ -249,16 +270,16 @@ def split_into_species(
             # generate a new rep for new species when a network doesn't match any
             # other species rep
             species.append(len(species))
-            species_reps.append((network_connections, network_connection_data,))
+            species_reps.append((network_connections, network_connection_weights,))
 
     return species
 
 
 def _genetic_distance(
     network_a_connections: List[ConnectionInnovation],
-    network_a_connections_data: ConnectionProperties,
+    network_a_connection_weights: ConnectionWeights,
     network_b_connections: List[ConnectionInnovation],
-    network_b_connections_data: ConnectionProperties,
+    network_b_connection_weights: ConnectionWeights,
     genetic_distance_parameters: Dict[str, float],
 ) -> float:
     """calculate the genetic distance between two networks
@@ -266,11 +287,9 @@ def _genetic_distance(
     Arguments:
         network_a_connections {List[List[ConnectionInnovation]]} -- connections of network a
         network_a_connections_data {List[ConnectionProperties]} -- data of connections of network a
-        network_a_nodes_data {List[NodeProperties]} -- data of nodes of network a
         network_a_nodes {List[Nodes]} -- nodes of network a
         network_b_connections {List[List[ConnectionInnovation]]} -- connections of network b
         network_b_connections_data {List[ConnectionProperties]} -- data of connections of network b
-        network_b_nodes_data {List[NodeProperties]} -- data of nodes of network b
         network_b_nodes {List[Nodes]} -- nodes of network b
         genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
 
@@ -289,13 +308,13 @@ def _genetic_distance(
     excess_amount = 0
     weight_differences = []
 
-    for a_connection, a_connection_data in zip(
-        network_a_connections, network_a_connections_data.weights
+    for a_connection, a_connection_weight in zip(
+        network_a_connections, network_a_connection_weights
     ):
         if a_connection in network_b_connections:
             weight_differences.append(
-                a_connection_data
-                - network_b_connections_data.weights[
+                a_connection_weight
+                - network_b_connection_weights.weights[
                     network_b_connections.index(a_connection)
                 ]
             )
@@ -328,20 +347,23 @@ def _genetic_distance(
 
 def new_generation(
     networks_connections: List[List[ConnectionInnovation]],
-    networks_connections_data: List[ConnectionProperties],
+    networks_connection_weights: List[ConnectionWeights],
+    networks_connection_states: List[ConnectionStates],
     networks_nodes: List[Nodes],
     networks_scores: List[float],
     networks_species: List[int],
     genetic_distance_parameters: Dict[str, float],
 ) -> Tuple[
-    List[List[ConnectionInnovation]], List[ConnectionProperties], List[Nodes],
+    List[List[ConnectionInnovation]],
+    List[ConnectionWeights],
+    List[ConnectionStates],
+    List[Nodes],
 ]:
     """creates a new generation of networks based on the previous network's scores
 
     Arguments:
         networks_connections {List[List[ConnectionInnovation]]} -- connections of each network
         networks_connection_data {List[ConnectionProperties]} -- data of connections of each network
-        networks_node_data {List[NodeProperties]} -- data of nodes of each network
         networks_nodes {List[Nodes]} -- nodes of each network
         networks_species {List[int]} -- species of each network
         networks_scores {List[float]} -- scores of each networks from their environments
@@ -349,7 +371,7 @@ def new_generation(
 
     Returns:
         Tuple[List[List[ConnectionInnovation]],List[ConnectionProperties],
-              List[NodeProperties],List[Nodes],] -- new generation
+              List[Nodes],] -- new generation
     """
 
     # normalize scores using species fitness sharing
@@ -361,33 +383,40 @@ def new_generation(
 
     # lists for new generation
     new_networks_connections = []
-    new_networks_connection_data = []
+    new_networks_connection_weights = []
+    new_networks_connection_states = []
     new_networks_nodes = []
     # generate a new network from two randomly chosen parents
     # with each parent being chosen according to its score
     # using crossover and mutation
-    for _ in range(networks_amount):
-        parent_a, parent_b = np.random.choice(networks, size=2, p=normalized_scores)
+    for parent_a, parent_b in np.random.choice(
+        networks, size=(networks_amount, 2), p=normalized_scores
+    ):
         (
             new_network_connections,
-            new_network_connection_data,
+            new_network_connection_weights,
+            new_network_connection_states,
             network_nodes,
         ) = _crossover_connections(
             networks_nodes[parent_a],
             networks_connections[parent_a],
-            networks_connections_data[parent_a],
+            networks_connection_weights[parent_a],
+            networks_connection_states[parent_a],
             networks_nodes[parent_b],
             networks_connections[parent_b],
-            networks_connections_data[parent_b],
+            networks_connection_weights[parent_b],
+            networks_connection_states[parent_b],
             genetic_distance_parameters,
         )
         new_networks_connections.append(new_network_connections)
-        new_networks_connection_data.append(new_network_connection_data)
+        new_networks_connection_weights.append(new_network_connection_weights)
+        new_networks_connection_states.append(new_network_connection_states)
         new_networks_nodes.append(network_nodes)
 
     return (
         new_networks_connections,
-        new_networks_connection_data,
+        new_networks_connection_weights,
+        new_networks_connection_states,
         new_networks_nodes,
     )
 
@@ -395,30 +424,20 @@ def new_generation(
 def _crossover_connections(
     network_a_nodes: Nodes,
     network_a_connections: List[ConnectionInnovation],
-    network_a_connections_data: ConnectionProperties,
+    network_a_connection_weights: ConnectionWeights,
+    network_a_connection_states: ConnectionStates,
     network_b_nodes: Nodes,
     network_b_connections: List[ConnectionInnovation],
-    network_b_connections_data: ConnectionProperties,
+    network_b_connection_weights: ConnectionWeights,
+    network_b_connection_states: ConnectionStates,
     genetic_distance_parameters: Dict[str, float],
-) -> Tuple[List[ConnectionInnovation], ConnectionProperties, Nodes]:
+) -> Tuple[List[ConnectionInnovation], ConnectionWeights, ConnectionStates, Nodes]:
     new_network_connections = []
     new_network_connections_weights = []
     new_network_connections_enabled = []
     new_network_nodes = []
 
-    # get common connections
-    for a_connection, a_connection_data in zip(
-        network_a_connections, network_a_connections_data
-    ):
-        # if connection is matching the child inherits it
-        if a_connection in network_b_connections:
-            new_network_connections.append(a_connection)
-
-    new_network_connections_data = ConnectionProperties(
-        new_network_connections_weights, new_network_connections_enabled
-    )
-    new_network_nodes = Nodes(new_network_nodes)
-    return new_network_connections, new_network_connections_data, new_network_nodes
+    raise NotImplementedError()
 
 
 def _normalize_scores(

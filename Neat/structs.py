@@ -1,4 +1,5 @@
-from typing import NamedTuple, List, Callable
+from typing import List, NamedTuple, Iterator
+
 import gym
 
 
@@ -7,9 +8,18 @@ class Environments(NamedTuple):
     environments: List[gym.Env]
 
 
-class ConnectionProperties(NamedTuple):
+class ConnectionWeights(NamedTuple):
     weights: List[float]
-    enabled: List[bool]
+
+    def __iter__(self) -> Iterator[float]:
+        return iter(self.weights)
+
+
+class ConnectionStates(NamedTuple):
+    states: List[bool]
+
+    def __iter__(self) -> Iterator[bool]:
+        return iter(self.states)
 
 
 class Nodes(NamedTuple):
