@@ -76,6 +76,10 @@ def _get_node_output(
     if node_index in base_nodes.input_nodes:
         return inputs[node_index]
 
+    # the output of the bias node is always 1
+    if node_index == base_nodes.bias_node:
+        return 1.0
+
     # since input nodes don't have properties, the node_properties_index is offset by
     # the input node amount
     return _activation_function(  # activation function of node
