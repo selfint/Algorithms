@@ -379,7 +379,7 @@ def _genetic_distance(
 
 def new_generation(
     networks_connections: List[List[ConnectionInnovation]],
-    networks_connection_data: List[ConnectionProperties],
+    networks_connections_data: List[ConnectionProperties],
     networks_node_data: List[NodeProperties],
     networks_nodes: List[Nodes],
     networks_scores: List[float],
@@ -410,8 +410,64 @@ def new_generation(
     # normalize scores using species fitness sharing
     normalized_scores = _normalize_scores(networks_scores, networks_species)
 
-    #
+    # use normalized scores as propabilities to select networks to parent offspings
+    networks_amount = len(normalized_scores)
+    networks = np.arange(networks_amount)
 
+    # lists for new generation
+    new_networks_connections = []
+    new_networks_connection_data = []
+    new_networks_nodes = []
+    new_networks_node_data = []
+    # generate a new network from two randomly chosen parents
+    # with each parent being chosen according to its score
+    # using crossover and mutation
+    for _ in range(networks_amount):
+        parent_a, parent_b = np.random.choice(networks, size=2, p=normalized_scores)
+        network_connections, network_connection_data = _crossover_connections(
+            networks_connections[parent_a],
+            networks_connections_data[parent_a],
+            networks_connections[parent_b],
+            networks_connections_data[parent_b],
+            genetic_distance_parameters,
+        )
+        network_nodes, network_node_data = _crossover_nodes(
+            networks_nodes[parent_a],
+            networks_node_data[parent_a],
+            networks_nodes[parent_b],
+            networks_node_data[parent_b],
+            genetic_distance_parameters,
+        )
+        new_networks_connections.append(network_connections)
+        new_networks_connection_data.append(network_connection_data)
+        new_networks_node_data.append(network_node_data)
+        new_networks_nodes.append(network_nodes)
+
+    return (
+        new_networks_connections,
+        new_networks_connection_data,
+        new_networks_node_data,
+        new_networks_nodes,
+    )
+
+
+def _crossover_connections(
+    network_a_connections: List[ConnectionInnovation],
+    network_a_connections_data: ConnectionProperties,
+    network_b_connections: List[ConnectionInnovation],
+    network_b_connections_data: ConnectionProperties,
+    genetic_distance_parameters: Dict[str, float],
+) -> Tuple[List[ConnectionInnovation], ConnectionProperties]:
+    raise NotImplementedError()
+
+
+def _crossover_nodes(
+    network_a_nodes: Nodes,
+    network_a_nodes_data: NodeProperties,
+    network_b_nodes: Nodes,
+    network_b_nodes_data: NodeProperties,
+    genetic_distance_parameters: Dict[str, float],
+) -> Tuple[Nodes, NodeProperties]:
     raise NotImplementedError()
 
 
