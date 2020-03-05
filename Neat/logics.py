@@ -342,6 +342,8 @@ def _genetic_distance(
         .all(-1)
         .any(-1)
     )
+
+    # get common connections weight values
     common_connections_weights_a = network_a_connection_weights.weights[
         common_connections_indices_a
     ]
