@@ -240,6 +240,9 @@ def split_into_species(
     networks_connection_directions: List[ConnectionDirections],
     networks_connection_weights: List[ConnectionWeights],
     genetic_distance_parameters: Dict[str, float],
+    previous_generation_species_reps: List[
+        Tuple[ConnectionDirections, ConnectionWeights]
+    ] = None,
 ) -> List[int]:
     """assign a species to each network
 
@@ -254,7 +257,11 @@ def split_into_species(
     """
     genetic_distance_threshold = genetic_distance_parameters["threshold"]
     species = []
-    species_reps: List[Tuple[ConnectionDirections, ConnectionWeights]] = []
+
+    # if no previous generation is available, generate species reps from current generation
+    species_reps: List[
+        Tuple[ConnectionDirections, ConnectionWeights]
+    ] = previous_generation_species_reps or []
     for (network_connection_directions, network_connection_weights,) in zip(
         networks_connection_directions, networks_connection_weights,
     ):
@@ -335,15 +342,17 @@ def _genetic_distance(
         .all(-1)
         .any(-1)
     )
-    common_connections_a = network_a_connection_weights.weights[
+    common_connections_weights_a = network_a_connection_weights.weights[
         common_connections_indices_a
     ]
-    common_connections_b = network_b_connection_weights.weights[
+    common_connections_weights_b = network_b_connection_weights.weights[
         common_connections_indices_b
     ]
 
     # get the average distance between two connection weights
-    weight_difference = np.average(abs(common_connections_a - common_connections_b))
+    weight_difference = np.average(
+        abs(common_connections_weights_a - common_connections_weights_b)
+    )
 
     # TODO: add disjoint and excess calculation
 
