@@ -1,4 +1,4 @@
-from typing import Iterator, List, NamedTuple
+from typing import Dict, Iterator, List, NamedTuple, Tuple
 
 import gym
 import numpy as np
@@ -31,8 +31,10 @@ class ConnectionDirections(NamedTuple):
     directions: np.ndarray
 
 
-class ConnectionInnovations(NamedTuple):
-    innovations: np.ndarray
+class ConnectionInnovationsMap(NamedTuple):
+    """maps a connection direction to an innovation number"""
+
+    innovations: Dict[Tuple[int, int], int]
 
 
 class NodeInnovation(NamedTuple):

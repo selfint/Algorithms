@@ -10,6 +10,7 @@ from gym import spaces
 from structs import (
     BaseNodes,
     ConnectionDirections,
+    ConnectionInnovationsMap,
     ConnectionWeights,
     ConnectionStates,
     ConnectionDirections,
@@ -81,8 +82,8 @@ def _get_node_output(
 
     Returns:
         float -- output of node
-    """
     # input nodes are just placeholders for the network input
+    """
     if node_id in base_nodes.input_nodes:
         return inputs[node_id]
 
@@ -387,27 +388,15 @@ def new_generation(
     networks_connection_states: List[ConnectionStates],
     networks_scores: List[float],
     networks_species: List[int],
+    global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
 ) -> Tuple[
     List[ConnectionDirections],
     List[ConnectionWeights],
     List[ConnectionStates],
     List[Nodes],
+    ConnectionInnovationsMap,
 ]:
-    """creates a new generation of networks based on the previous network's scores
-
-    Arguments:
-        networks_connection_directions {List[ConnectionDirections]} -- directions of connections of each network
-        networks_connection_weights {List[ConnectionWeights]} -- weights of connections of each network
-        networks_connection_states {List[ConnectionStates]} -- states of connections of each network
-        networks_species {List[int]} -- species of each network
-        networks_scores {List[float]} -- scores of each networks from their environments
-        genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
-
-    Returns:
-        Tuple[List[ConnectionDirections],List[ConnectionProperties],
-              List[Nodes],] -- new generation
-    """
 
     # normalize scores using species fitness sharing
     normalized_scores = _normalize_scores(networks_scores, networks_species)
@@ -420,18 +409,17 @@ def new_generation(
     new_networks_connections = []
     new_networks_connection_weights = []
     new_networks_connection_states = []
-    new_networks_nodes = []
     # generate a new network from two randomly chosen parents
     # with each parent being chosen according to its score
     # using crossover and mutation
-    for parent_a, parent_b in np.random.choice(
-        networks, size=(networks_amount, 2), p=normalized_scores
-    ):
+    for _ in range(networks_amount):
+        parent_a, parent_b = np.random.choice(
+            networks, size=2, p=normalized_scores, replace=False
+        )
         (
             new_network_connections,
             new_network_connection_weights,
             new_network_connection_states,
-            network_nodes,
         ) = _crossover(
             networks_connection_directions[parent_a],
             networks_connection_weights[parent_a],
@@ -439,18 +427,17 @@ def new_generation(
             networks_connection_directions[parent_b],
             networks_connection_weights[parent_b],
             networks_connection_states[parent_b],
+            global_innovation_history,
             genetic_distance_parameters,
         )
         new_networks_connections.append(new_network_connections)
         new_networks_connection_weights.append(new_network_connection_weights)
         new_networks_connection_states.append(new_network_connection_states)
-        new_networks_nodes.append(network_nodes)
 
     return (
         new_networks_connections,
         new_networks_connection_weights,
         new_networks_connection_states,
-        new_networks_nodes,
     )
 
 
@@ -461,12 +448,12 @@ def _crossover(
     network_b_connections: ConnectionDirections,
     network_b_connection_weights: ConnectionWeights,
     network_b_connection_states: ConnectionStates,
+    global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
-) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates, Nodes]:
+) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates]:
     new_network_connections = []
     new_network_connections_weights = []
     new_network_connections_enabled = []
-    new_network_nodes = []
 
     raise NotImplementedError()
 
