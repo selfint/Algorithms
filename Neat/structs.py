@@ -5,7 +5,6 @@ import numpy as np
 
 
 class Environments(NamedTuple):
-    # TODO: delete strcut, just use List[gym.Env]
     environments: List[gym.Env]
 
 
@@ -41,3 +40,6 @@ class BaseNodes(NamedTuple):
     input_nodes: List[int]
     output_nodes: List[int]
     bias_node: int = -1
+
+
+# TODO: replace as much classes as possible with a custom type
