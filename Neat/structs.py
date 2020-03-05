@@ -23,10 +23,6 @@ class ConnectionStates(NamedTuple):
         return iter(self.states)
 
 
-class Nodes(NamedTuple):
-    nodes: np.ndarray
-
-
 class ConnectionDirections(NamedTuple):
     directions: np.ndarray
 

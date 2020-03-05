@@ -15,7 +15,6 @@ from structs import (
     ConnectionStates,
     ConnectionDirections,
     Environments,
-    Nodes,
 )
 
 
@@ -394,7 +393,6 @@ def new_generation(
     List[ConnectionDirections],
     List[ConnectionWeights],
     List[ConnectionStates],
-    List[Nodes],
     ConnectionInnovationsMap,
 ]:
 
@@ -451,7 +449,7 @@ def _crossover(
     global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
 ) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates]:
-    new_network_connections = []
+    new_network_connection_directions = []
     new_network_connections_weights = []
     new_network_connections_enabled = []
 
