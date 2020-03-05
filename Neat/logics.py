@@ -284,28 +284,25 @@ def split_into_species(
 
 
 def _genetic_distance(
-    network_a_connections: ConnectionDirections,
+    network_a_connection_directions: ConnectionDirections,
     network_a_connection_weights: ConnectionWeights,
-    network_b_connections: ConnectionDirections,
+    network_b_connection_directions: ConnectionDirections,
     network_b_connection_weights: ConnectionWeights,
     genetic_distance_parameters: Dict[str, float],
 ) -> float:
     """calculate the genetic distance between two networks
 
     Arguments:
-        network_a_connections {List[ConnectionDirections]} -- connections of network a
-        network_a_connections_data {List[ConnectionProperties]} -- data of connections of network a
-        network_a_nodes {List[Nodes]} -- nodes of network a
-        network_b_connections {List[ConnectionDirections]} -- connections of network b
-        network_b_connections_data {List[ConnectionProperties]} -- data of connections of network b
-        network_b_nodes {List[Nodes]} -- nodes of network b
+        network_a_connection_directions {ConnectionDirections} -- connections of network a
+        network_a_connection_weights {ConnectionWeights} -- weights of connections of network a
+        network_b_connection_directions {ConnectionDirections} -- connections of network b
+        network_b_connections_weights {ConnectionWeights} -- data of connections of network b
         genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
 
     Returns:
         float -- genetic distance
     """
     # TODO: split into separate functions
-    # TODO: only accept network weights instead of weights and enabled
     # innovation index that splits disjoint and excess genes
     # TODO: calculate last_common_innovation using connection innovations
     # last_common_innovation = min(max(network_a_nodes.nodes), max(network_b_nodes.nodes))
@@ -314,41 +311,42 @@ def _genetic_distance(
     # get average weight difference
     disjoint_amount = 0
     excess_amount = 0
-    weight_differences = (
-        network_a_connection_weights.weights[
-            np.where(
-                network_a_connection_weights.weights
-                in network_b_connection_weights.weights
-            )
-        ]
-        - network_b_connection_weights.weights[
-            np.where(
-                network_b_connection_weights.weights
-                in network_a_connection_weights.weights
-            )
-        ]
-    )
-    print(weight_differences)
 
-    for a_connection, a_connection_weight in zip(
-        network_a_connections, network_a_connection_weights
-    ):
-        if a_connection in network_b_connections:
-            weight_differences.append(
-                a_connection_weight
-                - network_b_connection_weights.weights[
-                    network_b_connections.index(a_connection)
-                ]
-            )
-        # TODO: add disjoint and excess calculation
-    weight_difference = np.average(weight_differences)
+    # fancy numpy trick to get the weights of all connections in a that are present in b
+    # and vice-versa
+    common_connections_indices_a = (
+        (
+            network_a_connection_directions.directions[:, None]
+            == network_b_connection_directions.directions
+        )
+        .all(-1)
+        .any(-1)
+    )
+    common_connections_indices_b = (
+        (
+            network_b_connection_directions.directions[:, None]
+            == network_a_connection_directions.directions
+        )
+        .all(-1)
+        .any(-1)
+    )
+    common_connections_a = network_a_connection_weights.weights[
+        common_connections_indices_a
+    ]
+    common_connections_b = network_b_connection_weights.weights[
+        common_connections_indices_b
+    ]
+
+    # get the average distance between two connection weights
+    weight_difference = np.average(abs(common_connections_a - common_connections_b))
+
+    # TODO: add disjoint and excess calculation
 
     # calculate genetic distance
     c1 = genetic_distance_parameters["excess_constant"]
     c2 = genetic_distance_parameters["disjoint_constant"]
     c3 = genetic_distance_parameters["weight_bias_constant"]
     large_genome_size = genetic_distance_parameters["large_genome_size"]
-    weight_difference = abs(weight_difference) / 2
     # TODO: calculate largest_genome_size using connection innovations
     largest_genome_size = 0
 
