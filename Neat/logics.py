@@ -239,6 +239,7 @@ def _get_episode_reward(
 def split_into_species(
     networks_connection_directions: List[ConnectionDirections],
     networks_connection_weights: List[ConnectionWeights],
+    global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
     previous_generation_species_reps: List[
         Tuple[ConnectionDirections, ConnectionWeights]
@@ -277,6 +278,7 @@ def split_into_species(
                     network_connection_weights,
                     rep_connection_directions,
                     rep_connection_weights,
+                    global_innovation_history,
                     genetic_distance_parameters,
                 )
                 < genetic_distance_threshold
@@ -300,6 +302,7 @@ def _genetic_distance(
     network_a_connection_weights: ConnectionWeights,
     network_b_connection_directions: ConnectionDirections,
     network_b_connection_weights: ConnectionWeights,
+    global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
 ) -> float:
     """calculate the genetic distance between two networks
@@ -316,13 +319,7 @@ def _genetic_distance(
     """
     # TODO: split into separate functions
     # innovation index that splits disjoint and excess genes
-    # TODO: calculate last_common_innovation using connection innovations
     # last_common_innovation = min(max(network_a_nodes.nodes), max(network_b_nodes.nodes))
-
-    # get disjoint and excess amounts
-    # get average weight difference
-    disjoint_amount = 0
-    excess_amount = 0
 
     # fancy numpy trick to get the weights of all connections in a that are present in b
     # and vice-versa
@@ -351,20 +348,58 @@ def _genetic_distance(
         common_connections_indices_b
     ]
 
+    # get common connections and last common innovation
+    common_connections_directions_value: np.ndarray = network_a_connection_directions.directions[
+        common_connections_indices_a
+    ]
+
+    last_common_innovation = np.max(
+        _vectorized_innovation_lookup(
+            global_innovation_history, common_connections_directions_value
+        )
+    )
+
+    # get uncommon connections and innovations
+    uncommon_connections_directions_a = network_a_connection_directions.directions[
+        np.invert(common_connections_indices_a)
+    ]
+
+    uncommon_connections_directions_b = network_b_connection_directions.directions[
+        np.invert(common_connections_indices_b)
+    ]
+
+    # get uncommon connection innovation numbers
+    uncommon_connection_innovations_a = _vectorized_innovation_lookup(
+        global_innovation_history, uncommon_connections_directions_a
+    )
+
+    uncommon_connection_innovations_b = _vectorized_innovation_lookup(
+        global_innovation_history, uncommon_connections_directions_b
+    )
+
     # get the average distance between two connection weights
     weight_difference = np.average(
         abs(common_connections_weights_a - common_connections_weights_b)
     )
 
-    # TODO: add disjoint and excess calculation
+    # get disjoint and excess amounts
+    a_disjoints = np.where(uncommon_connection_innovations_a < last_common_innovation)
+    b_disjoints = np.where(uncommon_connection_innovations_b < last_common_innovation)
+    disjoint_amount = np.sum(a_disjoints) + np.sum(b_disjoints)
+    excess_amount = np.sum(np.invert(a_disjoints)) + np.sum(np.invert(b_disjoints))
 
     # calculate genetic distance
     c1 = genetic_distance_parameters["excess_constant"]
     c2 = genetic_distance_parameters["disjoint_constant"]
     c3 = genetic_distance_parameters["weight_bias_constant"]
     large_genome_size = genetic_distance_parameters["large_genome_size"]
-    # TODO: calculate largest_genome_size using connection innovations
-    largest_genome_size = 0
+
+    largest_genome_size = np.max(
+        (
+            network_a_connection_directions.directions.max(),
+            network_b_connection_directions.directions.max(),
+        )
+    )
 
     # don't normalize excess and disjoint difference in small genomes
     if largest_genome_size < large_genome_size:
@@ -379,6 +414,18 @@ def _genetic_distance(
         )
 
     return genetic_distance
+
+
+def _vectorized_innovation_lookup(
+    global_innovation_history: ConnectionInnovationsMap,
+    connection_directions_value: np.ndarray,
+):
+    tupled_common_connections = np.array(
+        np.array(list(map(tuple, connection_directions_value)), dtype="i, i")
+    )
+    return np.vectorize(lambda c: global_innovation_history.innovations[tuple(c)])(
+        tupled_common_connections
+    )
 
 
 def new_generation(

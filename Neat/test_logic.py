@@ -1,3 +1,4 @@
+from structs import ConnectionInnovationsMap
 import numpy as np
 import pytest
 import gym
@@ -32,15 +33,16 @@ def generate_temp_network(
         .reshape(2, -1)
         .T
     )
+    all_chosen_connections = []
     for _ in range(network_amount):
-        connection_directions = ConnectionDirections(
-            all_possible_connections[
-                np.random.choice(
-                    all_possible_connections.shape[0], connection_amount, replace=False
-                ),
-                :,
-            ]
-        )
+        chosen_connections = all_possible_connections[
+            np.random.choice(
+                all_possible_connections.shape[0], connection_amount, replace=False
+            ),
+            :,
+        ]
+        all_chosen_connections.append(chosen_connections)
+        connection_directions = ConnectionDirections(chosen_connections)
         connection_weights = ConnectionWeights(
             np.random.normal(
                 loc=0, scale=0.1, size=connection_directions.directions.shape[0]
@@ -53,11 +55,23 @@ def generate_temp_network(
         networks_connection_weights.append(connection_weights)
         networks_connection_states.append(connection_states)
     base_nodes = BaseNodes(list(range(input_amount)), list(range(output_amount)))
+    all_chosen_connections = np.array(all_chosen_connections).reshape(-1, 2)
+    innovation_map = dict()
+    counter = 0
+    for connection in all_chosen_connections:
+        tuple_connection = tuple(connection)
+        if tuple_connection in innovation_map:
+            continue
+        else:
+            innovation_map[tuple_connection] = counter
+            counter += 1
+    global_innovation_history = ConnectionInnovationsMap(innovation_map)
     return (
         networks_connection_directions,
         networks_connection_weights,
         networks_connection_states,
         base_nodes,
+        global_innovation_history,
     )
 
 
@@ -67,6 +81,7 @@ def test_feed_forward():
         connection_weights,
         connection_states,
         base_nodes,
+        _,
     ) = generate_temp_network()
     inputs = np.random.random(size=len(base_nodes.input_nodes))
     result = feed_forward(
@@ -86,6 +101,7 @@ def test_evaluate_network():
         networks_connection_weights,
         networks_connection_states,
         base_nodes,
+        _,
     ) = generate_temp_network(network_amount)
     result = evaluate_networks(
         environments,
@@ -100,8 +116,14 @@ def test_evaluate_network():
 
 
 def test_split_into_species():
-    network_amount = 100
-    networks_connections, networks_connection_weights, _, _ = generate_temp_network(
+    network_amount = 1000
+    (
+        networks_connections,
+        networks_connection_weights,
+        _,
+        _,
+        global_innovation_history,
+    ) = generate_temp_network(
         network_amount=network_amount, max_hidden_amount=4, connection_amount=30
     )
     genetic_distance_parameters = {
@@ -112,7 +134,10 @@ def test_split_into_species():
         "threshold": 3.0,
     }
     result = split_into_species(
-        networks_connections, networks_connection_weights, genetic_distance_parameters,
+        networks_connections,
+        networks_connection_weights,
+        global_innovation_history,
+        genetic_distance_parameters,
     )
     print(result)
 
