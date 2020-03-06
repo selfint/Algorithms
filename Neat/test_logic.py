@@ -144,7 +144,7 @@ def test_split_into_species():
 
 
 def test_new_generation():
-    network_amount = 10
+    network_amount = 100
     environments = Environments(
         [gym.make("CartPole-v0") for _ in range(network_amount)]
     )
@@ -155,7 +155,7 @@ def test_new_generation():
         base_nodes,
         global_innovation_history,
     ) = generate_temp_network(
-        network_amount=network_amount, max_hidden_amount=4, connection_amount=30
+        network_amount=network_amount, max_hidden_amount=0, connection_amount=8
     )
     genetic_distance_parameters = {
         "excess_constant": 1.0,
@@ -165,34 +165,50 @@ def test_new_generation():
         "threshold": 3.0,
         "interspecies_mating_rate": 0.001,
     }
-    networks_scores = evaluate_networks(
-        environments,
-        networks_connection_directions,
-        networks_connection_weights,
-        networks_connection_states,
-        base_nodes,
-        200,
-        100,
-    )
-    networks_species = split_into_species(
-        networks_connection_directions,
-        networks_connection_weights,
-        global_innovation_history,
-        genetic_distance_parameters,
-    )
-    result = new_generation(
-        networks_connection_directions,
-        networks_connection_weights,
-        networks_connection_states,
-        networks_scores,
-        networks_species,
-        global_innovation_history,
-        genetic_distance_parameters,
-    )
+    generations = 50
+    networks_scores = np.zeros(shape=(network_amount))
+    for i in range(generations):
+        networks_scores = evaluate_networks(
+            environments,
+            networks_connection_directions,
+            networks_connection_weights,
+            networks_connection_states,
+            base_nodes,
+            max_steps=200,
+            episodes=1,
+            score_exponent=2,
+            render=i == 49,
+        )
+        print(i)
+        print(networks_scores.max())
+        print(np.average(networks_scores))
+        print("\n")
+        networks_species = split_into_species(
+            networks_connection_directions,
+            networks_connection_weights,
+            global_innovation_history,
+            genetic_distance_parameters,
+        )
+        (
+            networks_connection_directions,
+            networks_connection_weights,
+            networks_connection_states,
+            global_innovation_history,
+        ) = new_generation(
+            networks_connection_directions,
+            networks_connection_weights,
+            networks_connection_states,
+            networks_scores,
+            networks_species,
+            global_innovation_history,
+            genetic_distance_parameters,
+        )
+    assert networks_scores.max() > 200
 
 
 if __name__ == "__main__":
-    test_feed_forward()
-    test_evaluate_network()
-    test_split_into_species()
+    # test_feed_forward()
+    # test_evaluate_network()
+    # test_split_into_species()
+    test_new_generation()
 

@@ -139,8 +139,9 @@ def evaluate_networks(
     base_nodes: BaseNodes,
     max_steps: int,
     episodes: int,
+    score_exponent: int = 1,
     render: bool = False,
-) -> List[float]:
+) -> np.ndarray:
     """calculate the average episode reward for each network
 
     Arguments:
@@ -156,36 +157,39 @@ def evaluate_networks(
         render {bool} -- render episodes (default: {False})
 
     Returns:
-        List[float] -- average network rewards over n episodes
+        np.ndarray -- average network rewards over n episodes
     """
-    return np.array(
-        [
-            np.average(
-                [
-                    _get_episode_reward(
-                        environment,
-                        max_steps,
-                        network_connections,
-                        network_connection_weights,
-                        network_connection_states,
-                        base_nodes,
-                        render,
-                    )
-                    for _ in range(episodes)
-                ]
-            )
-            for (
-                environment,
-                network_connections,
-                network_connection_weights,
-                network_connection_states,
-            ) in zip(
-                environments.environments,
-                networks_connection_directions,
-                networks_connection_weights,
-                networks_connection_states,
-            )
-        ]
+    return (
+        np.array(
+            [
+                np.average(
+                    [
+                        _get_episode_reward(
+                            environment,
+                            max_steps,
+                            network_connections,
+                            network_connection_weights,
+                            network_connection_states,
+                            base_nodes,
+                            render,
+                        )
+                        for _ in range(episodes)
+                    ]
+                )
+                for (
+                    environment,
+                    network_connections,
+                    network_connection_weights,
+                    network_connection_states,
+                ) in zip(
+                    environments.environments,
+                    networks_connection_directions,
+                    networks_connection_weights,
+                    networks_connection_states,
+                )
+            ]
+        )
+        ** score_exponent
     )
 
 
@@ -367,13 +371,17 @@ def _genetic_distance(
 
     # get disjoint and excess amounts
     a_disjoints = (
-        uncommon_connection_innovations_a < uncommon_connection_innovations_b.max()
+        (uncommon_connection_innovations_a < uncommon_connection_innovations_b.max())
+        if uncommon_connection_innovations_b.size != 0
+        else np.array([])
     )
     b_disjoints = (
-        uncommon_connection_innovations_b < uncommon_connection_innovations_a.max()
+        (uncommon_connection_innovations_b < uncommon_connection_innovations_a.max())
+        if uncommon_connection_innovations_a.size != 0
+        else np.array([])
     )
     disjoint_amount = np.sum(a_disjoints) + np.sum(b_disjoints)
-    excess_amount = np.sum(np.invert(a_disjoints)) + np.sum(np.invert(b_disjoints))
+    excess_amount = np.sum(a_disjoints == False) + np.sum(b_disjoints == False)
 
     # calculate genetic distance
     c1 = genetic_distance_parameters["excess_constant"]
@@ -433,6 +441,8 @@ def _vectorized_innovation_lookup(
     tupled_common_connections = np.array(
         np.array(list(map(tuple, connection_directions_value)), dtype="i, i")
     )
+    if tupled_common_connections.size == 0:
+        return np.array([])
     return np.vectorize(lambda c: global_innovation_history.innovations[tuple(c)])(
         tupled_common_connections
     )
@@ -496,9 +506,7 @@ def new_generation(
             # normalize probabilities
             species_probabilities = species_probabilities / species_probabilities.sum()
             parent_b = np.random.choice(
-                networks[
-                    np.invert(np.where(networks_species != networks_species[parent_a]))
-                ],
+                networks[np.where(networks_species != networks_species[parent_a])],
                 p=species_probabilities,
             )
 
@@ -539,6 +547,21 @@ def _crossover(
     global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
 ) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates]:
+    """combine two networks to form a child network
+
+    Arguments:
+        network_a_connection_directions {ConnectionDirections} -- ConnectionDirections
+        network_a_connection_weights {ConnectionWeights} -- ConnectionWeights
+        network_a_connection_states {ConnectionStates} -- ConnectionStates
+        network_b_connection_directions {ConnectionDirections} -- ConnectionDirections
+        network_b_connection_weights {ConnectionWeights} -- ConnectionWeights
+        network_b_connection_states {ConnectionStates} -- ConnectionStates
+        global_innovation_history {ConnectionInnovationsMap} -- ConnectionInnovationsMap
+        genetic_distance_parameters {Dict[str, float]} -- Dict[str, float]
+
+    Returns:
+        Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates] -- child network
+    """
 
     # get common connection indices
     common_connection_indices_a: np.ndarray
@@ -587,10 +610,10 @@ def _crossover(
 
     # randomly inherit uncommon connections
     uncommon_connections_mask_a: np.ndarray = np.random.choice(
-        [True, False], size=uncommon_connection_direction_values_a.size
+        [True, False], size=uncommon_connection_direction_values_a.shape[0]
     )
     uncommon_connections_mask_b: np.ndarray = np.random.choice(
-        [True, False], size=uncommon_connection_direction_values_b.size
+        [True, False], size=uncommon_connection_direction_values_b.shape[0]
     )
     inherited_uncommon_connection_direction_values = np.concatenate(
         (
