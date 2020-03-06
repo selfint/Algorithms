@@ -335,16 +335,10 @@ def _genetic_distance(
         common_connections_indices_b
     ]
 
-    # get common connections and last common innovation
+    # get common connections
     common_connections_directions_value = network_a_connection_directions.directions[
         common_connections_indices_a
     ]
-
-    last_common_innovation = np.max(
-        _vectorized_innovation_lookup(
-            global_innovation_history, common_connections_directions_value
-        )
-    )
 
     # get uncommon connections and innovations
     uncommon_connections_directions_a = network_a_connection_directions.directions[
@@ -370,8 +364,12 @@ def _genetic_distance(
     )
 
     # get disjoint and excess amounts
-    a_disjoints = np.where(uncommon_connection_innovations_a < last_common_innovation)
-    b_disjoints = np.where(uncommon_connection_innovations_b < last_common_innovation)
+    a_disjoints = (
+        uncommon_connection_innovations_a < uncommon_connection_innovations_b.max()
+    )
+    b_disjoints = (
+        uncommon_connection_innovations_b < uncommon_connection_innovations_a.max()
+    )
     disjoint_amount = np.sum(a_disjoints) + np.sum(b_disjoints)
     excess_amount = np.sum(np.invert(a_disjoints)) + np.sum(np.invert(b_disjoints))
 
