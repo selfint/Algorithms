@@ -37,6 +37,7 @@ class NodeInnovation(NamedTuple):
 
 
 class BaseNodes(NamedTuple):
+    # TODO: convert to numpy arrays
     input_nodes: List[int]
     output_nodes: List[int]
     bias_node: int = -1

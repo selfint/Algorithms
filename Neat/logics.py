@@ -6,6 +6,7 @@ from typing import List, Dict, Tuple
 import numpy as np
 import gym
 from gym import spaces
+from itertools import cycle
 
 from structs import (
     BaseNodes,
@@ -415,21 +416,13 @@ def _get_common_connection_indices(
     network_a_connection_directions: ConnectionDirections,
     network_b_connection_directions: ConnectionDirections,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    common_connections_indices_a = (
-        (
-            network_a_connection_directions.directions[:, None]
-            == network_b_connection_directions.directions
-        )
-        .all(-1)
-        .any(-1)
+    common_connections_indices_a = _row_in_array(
+        network_a_connection_directions.directions,
+        network_b_connection_directions.directions,
     )
-    common_connections_indices_b = (
-        (
-            network_b_connection_directions.directions[:, None]
-            == network_a_connection_directions.directions
-        )
-        .all(-1)
-        .any(-1)
+    common_connections_indices_b = _row_in_array(
+        network_b_connection_directions.directions,
+        network_a_connection_directions.directions,
     )
     return common_connections_indices_a, common_connections_indices_b
 
@@ -667,6 +660,89 @@ def _crossover(
     )
 
 
+def _mutate(
+    network_connection_directions: ConnectionDirections,
+    network_connection_weights: ConnectionWeights,
+    network_connection_states: ConnectionStates,
+    base_nodes: BaseNodes,
+    global_innovation_history: ConnectionInnovationsMap,
+    mutation_parameters: Dict[str, float],
+) -> Tuple[
+    ConnectionDirections, ConnectionWeights, ConnectionStates, ConnectionInnovationsMap
+]:
+    # weight permutation mutation
+    permutation_rate = mutation_parameters["permutation_rate"]
+    new_weights = network_connection_weights.weights * np.random.choice(
+        [1, 1.01, 0.99],
+        p=[1.0 - permutation_rate, permutation_rate / 2.0, permutation_rate / 2.0],
+        size=network_connection_weights.weights.size,
+    )
+
+    # random weight mutation
+    random_weight_rate = mutation_parameters["random_weight_rate"]
+    new_weights = np.place(
+        new_weights,
+        np.random.choice(
+            [True, False],
+            p=[1.0 - random_weight_rate, random_weight_rate],
+            size=new_weights.size,
+        ),
+        np.random.normal(size=new_weights.size),
+    )
+
+    # new connection mutation
+    new_connection_rate = mutation_parameters["new_connection_rate"]
+    if np.random.random_sample() < new_connection_rate:
+        all_nodes = np.unique(network_connection_directions.directions)
+        all_possible_connections = (
+            np.mgrid[
+                -1 : all_nodes.max(), max(base_nodes.input_nodes) : all_nodes.max(),
+            ]
+            .reshape(2, -1)
+            .T
+        )
+
+        # pick a random possible connection that isn't already in network connections
+        new_connection_direction = all_possible_connections[
+            np.random.choice(
+                np.where(
+                    _row_in_array(
+                        all_possible_connections,
+                        network_connection_directions.directions,
+                    )
+                    == False
+                )
+            )
+        ]
+
+        new_connection_weight = np.random.normal(scale=0.1)
+        new_connection_state = 1
+        new_connection_directions = ConnectionDirections(
+            np.concatenate(
+                (network_connection_directions.directions, new_connection_direction)
+            )
+        )
+        new_connection_weights = ConnectionWeights(
+            np.concatenate((network_connection_weights.weights, new_connection_weight))
+        )
+        new_connection_states = ConnectionStates(
+            np.concatenate((network_connection_states.states, new_connection_state))
+        )
+        new_connection_tuple = (
+            new_connection_direction[0],
+            new_connection_direction[1],
+        )
+        global_innovation_history.innovations[new_connection_tuple] = (
+            max(global_innovation_history.innovations.values()) + 1
+        )
+        return (
+            new_connection_directions,
+            new_connection_weights,
+            new_connection_states,
+            global_innovation_history,
+        )
+
+
 def _normalize_scores(
     networks_scores: List[float], networks_species: List[int]
 ) -> List[float]:
@@ -696,3 +772,7 @@ def _normalize_scores(
     normalized_scores = normalized_scores / np.sum(normalized_scores)
 
     return normalized_scores
+
+
+def _row_in_array(array_a: np.ndarray, array_b: np.ndarray) -> np.ndarray:
+    return (array_a[:, None] == array_b).all(-1).any(-1)
