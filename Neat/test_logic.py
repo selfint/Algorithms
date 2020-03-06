@@ -12,6 +12,7 @@ from logics import (
     feed_forward,
     evaluate_networks,
     split_into_species,
+    new_generation,
 )
 
 
@@ -116,7 +117,7 @@ def test_evaluate_network():
 
 
 def test_split_into_species():
-    network_amount = 1000
+    network_amount = 100
     (
         networks_connections,
         networks_connection_weights,
@@ -140,6 +141,54 @@ def test_split_into_species():
         genetic_distance_parameters,
     )
     print(result)
+
+
+def test_new_generation():
+    network_amount = 10
+    environments = Environments(
+        [gym.make("CartPole-v0") for _ in range(network_amount)]
+    )
+    (
+        networks_connection_directions,
+        networks_connection_weights,
+        networks_connection_states,
+        base_nodes,
+        global_innovation_history,
+    ) = generate_temp_network(
+        network_amount=network_amount, max_hidden_amount=4, connection_amount=30
+    )
+    genetic_distance_parameters = {
+        "excess_constant": 1.0,
+        "disjoint_constant": 1.0,
+        "weight_bias_constant": 0.4,
+        "large_genome_size": 20,
+        "threshold": 3.0,
+        "interspecies_mating_rate": 0.001,
+    }
+    networks_scores = evaluate_networks(
+        environments,
+        networks_connection_directions,
+        networks_connection_weights,
+        networks_connection_states,
+        base_nodes,
+        200,
+        100,
+    )
+    networks_species = split_into_species(
+        networks_connection_directions,
+        networks_connection_weights,
+        global_innovation_history,
+        genetic_distance_parameters,
+    )
+    result = new_generation(
+        networks_connection_directions,
+        networks_connection_weights,
+        networks_connection_states,
+        networks_scores,
+        networks_species,
+        global_innovation_history,
+        genetic_distance_parameters,
+    )
 
 
 if __name__ == "__main__":
