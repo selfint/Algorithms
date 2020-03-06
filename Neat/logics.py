@@ -158,33 +158,35 @@ def evaluate_networks(
     Returns:
         List[float] -- average network rewards over n episodes
     """
-    return [
-        np.average(
-            [
-                _get_episode_reward(
-                    environment,
-                    max_steps,
-                    network_connections,
-                    network_connection_weights,
-                    network_connection_states,
-                    base_nodes,
-                    render,
-                )
-                for _ in range(episodes)
-            ]
-        )
-        for (
-            environment,
-            network_connections,
-            network_connection_weights,
-            network_connection_states,
-        ) in zip(
-            environments.environments,
-            networks_connection_directions,
-            networks_connection_weights,
-            networks_connection_states,
-        )
-    ]
+    return np.array(
+        [
+            np.average(
+                [
+                    _get_episode_reward(
+                        environment,
+                        max_steps,
+                        network_connections,
+                        network_connection_weights,
+                        network_connection_states,
+                        base_nodes,
+                        render,
+                    )
+                    for _ in range(episodes)
+                ]
+            )
+            for (
+                environment,
+                network_connections,
+                network_connection_weights,
+                network_connection_states,
+            ) in zip(
+                environments.environments,
+                networks_connection_directions,
+                networks_connection_weights,
+                networks_connection_states,
+            )
+        ]
+    )
 
 
 def _get_episode_reward(
@@ -244,7 +246,7 @@ def split_into_species(
     previous_generation_species_reps: List[
         Tuple[ConnectionDirections, ConnectionWeights]
     ] = None,
-) -> List[int]:
+) -> np.array:
     """assign a species to each network
 
     Arguments:
@@ -254,7 +256,7 @@ def split_into_species(
         genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
 
     Returns:
-        List[int] -- species of each network by index
+        np.array -- species of each network by index
     """
     genetic_distance_threshold = genetic_distance_parameters["threshold"]
     species = []
@@ -294,7 +296,7 @@ def split_into_species(
                 (network_connection_directions, network_connection_weights,)
             )
 
-    return species
+    return np.array(species)
 
 
 def _genetic_distance(
@@ -440,8 +442,8 @@ def new_generation(
     networks_connection_directions: List[ConnectionDirections],
     networks_connection_weights: List[ConnectionWeights],
     networks_connection_states: List[ConnectionStates],
-    networks_scores: List[float],
-    networks_species: List[int],
+    networks_scores: np.ndarray,
+    networks_species: np.ndarray,
     global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
 ) -> Tuple[
@@ -465,6 +467,7 @@ def new_generation(
     # generate a new network from two randomly chosen parents
     # with each parent being chosen according to its score
     # using crossover and mutation
+    # TODO: assign children amount to each species
     for _ in range(networks_amount):
 
         # pick two random parents
@@ -476,20 +479,27 @@ def new_generation(
             np.random.random_sample()
             > genetic_distance_parameters["interspecies_mating_rate"]
         ):
+            species_probabilities: np.ndarray = normalized_scores[
+                networks_species == networks_species[parent_a]
+            ]
+            # normalize probabilities
+            species_probabilities = species_probabilities / species_probabilities.sum()
             parent_b = np.random.choice(
                 networks[np.where(networks_species == networks_species[parent_a])],
-                p=normalized_scores[
-                    np.where(networks_species == networks_species[parent_a])
-                ],
+                p=species_probabilities,
             )
         else:
+            species_probabilities = normalized_scores[
+                networks_species != networks_species[parent_a]
+            ]
+
+            # normalize probabilities
+            species_probabilities = species_probabilities / species_probabilities.sum()
             parent_b = np.random.choice(
                 networks[
-                    np.invert(np.where(networks_species == networks_species[parent_a]))
+                    np.invert(np.where(networks_species != networks_species[parent_a]))
                 ],
-                p=normalized_scores[
-                    np.invert(np.where(networks_species == networks_species[parent_a]))
-                ],
+                p=species_probabilities,
             )
 
         # generate child from two parents
@@ -515,6 +525,7 @@ def new_generation(
         new_networks_connection_directions,
         new_networks_connection_weights,
         new_networks_connection_states,
+        global_innovation_history,
     )
 
 
@@ -528,11 +539,109 @@ def _crossover(
     global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
 ) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates]:
-    new_network_connection_directions = []
-    new_network_connections_weights = []
-    new_network_connections_enabled = []
 
-    raise NotImplementedError()
+    # get common connection indices
+    common_connection_indices_a: np.ndarray
+    common_connection_indices_b: np.ndarray
+    (
+        common_connection_indices_a,
+        common_connection_indices_b,
+    ) = _get_common_connection_indices(
+        network_a_connection_directions, network_b_connection_directions
+    )
+
+    # inherit common connection properties
+    inherited_common_connection_direction_values: np.ndarray = network_a_connection_directions.directions[
+        common_connection_indices_a
+    ]
+
+    inherited_common_connection_weight_values: np.ndarray = network_a_connection_weights.weights[
+        common_connection_indices_a
+    ]
+
+    inherited_common_connection_state_values: np.ndarray = network_a_connection_states.states[
+        common_connection_indices_a
+    ]
+
+    # inherit uncommon connection properties
+    uncommon_connection_direction_values_a: np.array = network_a_connection_directions.directions[
+        np.invert(common_connection_indices_a)
+    ]
+    uncommon_connection_direction_values_b: np.array = network_b_connection_directions.directions[
+        np.invert(common_connection_indices_b)
+    ]
+
+    uncommon_connection_weight_values_a: np.array = network_a_connection_weights.weights[
+        np.invert(common_connection_indices_a)
+    ]
+    uncommon_connection_weight_values_b: np.array = network_b_connection_weights.weights[
+        np.invert(common_connection_indices_b)
+    ]
+
+    uncommon_connection_state_values_a: np.array = network_a_connection_states.states[
+        np.invert(common_connection_indices_a)
+    ]
+    uncommon_connection_state_values_b: np.array = network_b_connection_states.states[
+        np.invert(common_connection_indices_b)
+    ]
+
+    # randomly inherit uncommon connections
+    uncommon_connections_mask_a: np.ndarray = np.random.choice(
+        [True, False], size=uncommon_connection_direction_values_a.size
+    )
+    uncommon_connections_mask_b: np.ndarray = np.random.choice(
+        [True, False], size=uncommon_connection_direction_values_b.size
+    )
+    inherited_uncommon_connection_direction_values = np.concatenate(
+        (
+            uncommon_connection_direction_values_a[uncommon_connections_mask_a],
+            uncommon_connection_direction_values_b[uncommon_connections_mask_b],
+        )
+    )
+    inherited_uncommon_connection_weight_values = np.concatenate(
+        (
+            uncommon_connection_weight_values_a[uncommon_connections_mask_a],
+            uncommon_connection_weight_values_b[uncommon_connections_mask_b],
+        )
+    )
+    inherited_uncommon_connection_state_values = np.concatenate(
+        (
+            uncommon_connection_state_values_a[uncommon_connections_mask_a],
+            uncommon_connection_state_values_b[uncommon_connections_mask_b],
+        )
+    )
+
+    # generate child using inherited properties
+    child_connection_directions = ConnectionDirections(
+        np.concatenate(
+            (
+                inherited_common_connection_direction_values,
+                inherited_uncommon_connection_direction_values,
+            )
+        )
+    )
+    child_connection_weights = ConnectionWeights(
+        np.concatenate(
+            (
+                inherited_common_connection_weight_values,
+                inherited_uncommon_connection_weight_values,
+            )
+        )
+    )
+    child_connection_states = ConnectionStates(
+        np.concatenate(
+            (
+                inherited_common_connection_state_values,
+                inherited_uncommon_connection_state_values,
+            )
+        )
+    )
+
+    return (
+        child_connection_directions,
+        child_connection_weights,
+        child_connection_states,
+    )
 
 
 def _normalize_scores(
