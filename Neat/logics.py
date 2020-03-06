@@ -445,10 +445,12 @@ def new_generation(
     networks_connection_directions: List[ConnectionDirections],
     networks_connection_weights: List[ConnectionWeights],
     networks_connection_states: List[ConnectionStates],
+    base_nodes: BaseNodes,
     networks_scores: np.ndarray,
     networks_species: np.ndarray,
     global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
+    mutation_parameters: Dict[str, float],
 ) -> Tuple[
     List[ConnectionDirections],
     List[ConnectionWeights],
@@ -517,6 +519,20 @@ def new_generation(
             networks_connection_states[parent_b],
             global_innovation_history,
             genetic_distance_parameters,
+        )
+
+        # mutate child
+        (
+            new_network_connection_directions,
+            new_network_connection_weights,
+            new_network_connection_states,
+        ) = _mutate(
+            new_network_connection_directions,
+            new_network_connection_weights,
+            new_network_connection_states,
+            base_nodes,
+            global_innovation_history,
+            mutation_parameters,
         )
         new_networks_connection_directions.append(new_network_connection_directions)
         new_networks_connection_weights.append(new_network_connection_weights)
@@ -667,9 +683,7 @@ def _mutate(
     base_nodes: BaseNodes,
     global_innovation_history: ConnectionInnovationsMap,
     mutation_parameters: Dict[str, float],
-) -> Tuple[
-    ConnectionDirections, ConnectionWeights, ConnectionStates, ConnectionInnovationsMap
-]:
+) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates]:
     # weight permutation mutation
     permutation_rate = mutation_parameters["permutation_rate"]
     new_weights = network_connection_weights.weights * np.random.choice(
@@ -677,6 +691,7 @@ def _mutate(
         p=[1.0 - permutation_rate, permutation_rate / 2.0, permutation_rate / 2.0],
         size=network_connection_weights.weights.size,
     )
+    network_connection_weights = ConnectionWeights(new_weights)
 
     # random weight mutation
     random_weight_rate = mutation_parameters["random_weight_rate"]
@@ -689,6 +704,7 @@ def _mutate(
         ),
         np.random.normal(size=new_weights.size),
     )
+    network_connection_weights = ConnectionWeights(new_weights)
 
     # new connection mutation
     new_connection_rate = mutation_parameters["new_connection_rate"]
@@ -739,8 +755,12 @@ def _mutate(
             new_connection_directions,
             new_connection_weights,
             new_connection_states,
-            global_innovation_history,
         )
+    return (
+        network_connection_directions,
+        network_connection_weights,
+        network_connection_states,
+    )
 
 
 def _normalize_scores(
