@@ -254,7 +254,7 @@ def split_into_species(
         genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
 
     Returns:
-        List[int] -- species of each network
+        List[int] -- species of each network by index
     """
     genetic_distance_threshold = genetic_distance_parameters["threshold"]
     species = []
@@ -317,39 +317,26 @@ def _genetic_distance(
     Returns:
         float -- genetic distance
     """
-    # TODO: split into separate functions
-    # innovation index that splits disjoint and excess genes
-    # last_common_innovation = min(max(network_a_nodes.nodes), max(network_b_nodes.nodes))
-
     # fancy numpy trick to get the weights of all connections in a that are present in b
     # and vice-versa
-    common_connections_indices_a = (
-        (
-            network_a_connection_directions.directions[:, None]
-            == network_b_connection_directions.directions
-        )
-        .all(-1)
-        .any(-1)
-    )
-    common_connections_indices_b = (
-        (
-            network_b_connection_directions.directions[:, None]
-            == network_a_connection_directions.directions
-        )
-        .all(-1)
-        .any(-1)
+    (
+        common_connections_indices_a,
+        common_connections_indices_b,
+    ) = _get_common_connection_indices(
+        network_a_connection_directions, network_b_connection_directions
     )
 
     # get common connections weight values
     common_connections_weights_a = network_a_connection_weights.weights[
         common_connections_indices_a
     ]
+
     common_connections_weights_b = network_b_connection_weights.weights[
         common_connections_indices_b
     ]
 
     # get common connections and last common innovation
-    common_connections_directions_value: np.ndarray = network_a_connection_directions.directions[
+    common_connections_directions_value = network_a_connection_directions.directions[
         common_connections_indices_a
     ]
 
@@ -416,6 +403,29 @@ def _genetic_distance(
     return genetic_distance
 
 
+def _get_common_connection_indices(
+    network_a_connection_directions: ConnectionDirections,
+    network_b_connection_directions: ConnectionDirections,
+) -> Tuple[np.ndarray, np.ndarray]:
+    common_connections_indices_a = (
+        (
+            network_a_connection_directions.directions[:, None]
+            == network_b_connection_directions.directions
+        )
+        .all(-1)
+        .any(-1)
+    )
+    common_connections_indices_b = (
+        (
+            network_b_connection_directions.directions[:, None]
+            == network_a_connection_directions.directions
+        )
+        .all(-1)
+        .any(-1)
+    )
+    return common_connections_indices_a, common_connections_indices_b
+
+
 def _vectorized_innovation_lookup(
     global_innovation_history: ConnectionInnovationsMap,
     connection_directions_value: np.ndarray,
@@ -451,18 +461,42 @@ def new_generation(
     networks = np.arange(networks_amount)
 
     # lists for new generation
-    new_networks_connections = []
+    new_networks_connection_directions = []
     new_networks_connection_weights = []
     new_networks_connection_states = []
     # generate a new network from two randomly chosen parents
     # with each parent being chosen according to its score
     # using crossover and mutation
     for _ in range(networks_amount):
-        parent_a, parent_b = np.random.choice(
-            networks, size=2, p=normalized_scores, replace=False
-        )
+
+        # pick two random parents
+        parent_a: int = np.random.choice(networks, p=normalized_scores)
+
+        # slight chance of inter-species mating
+        parent_b: int
+        if (
+            np.random.random_sample()
+            > genetic_distance_parameters["interspecies_mating_rate"]
+        ):
+            parent_b = np.random.choice(
+                networks[np.where(networks_species == networks_species[parent_a])],
+                p=normalized_scores[
+                    np.where(networks_species == networks_species[parent_a])
+                ],
+            )
+        else:
+            parent_b = np.random.choice(
+                networks[
+                    np.invert(np.where(networks_species == networks_species[parent_a]))
+                ],
+                p=normalized_scores[
+                    np.invert(np.where(networks_species == networks_species[parent_a]))
+                ],
+            )
+
+        # generate child from two parents
         (
-            new_network_connections,
+            new_network_connection_directions,
             new_network_connection_weights,
             new_network_connection_states,
         ) = _crossover(
@@ -475,22 +509,22 @@ def new_generation(
             global_innovation_history,
             genetic_distance_parameters,
         )
-        new_networks_connections.append(new_network_connections)
+        new_networks_connection_directions.append(new_network_connection_directions)
         new_networks_connection_weights.append(new_network_connection_weights)
         new_networks_connection_states.append(new_network_connection_states)
 
     return (
-        new_networks_connections,
+        new_networks_connection_directions,
         new_networks_connection_weights,
         new_networks_connection_states,
     )
 
 
 def _crossover(
-    network_a_connections: ConnectionDirections,
+    network_a_connection_directions: ConnectionDirections,
     network_a_connection_weights: ConnectionWeights,
     network_a_connection_states: ConnectionStates,
-    network_b_connections: ConnectionDirections,
+    network_b_connection_directions: ConnectionDirections,
     network_b_connection_weights: ConnectionWeights,
     network_b_connection_states: ConnectionStates,
     global_innovation_history: ConnectionInnovationsMap,
