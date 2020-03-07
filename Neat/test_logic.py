@@ -55,7 +55,10 @@ def generate_temp_network(
         networks_connection_directions.append(connection_directions)
         networks_connection_weights.append(connection_weights)
         networks_connection_states.append(connection_states)
-    base_nodes = BaseNodes(list(range(input_amount)), list(range(output_amount)))
+    base_nodes = BaseNodes(
+        list(range(input_amount)),
+        list(range(input_amount, input_amount + output_amount)),
+    )
     all_chosen_connections = np.array(all_chosen_connections).reshape(-1, 2)
     innovation_map = dict()
     counter = 0
@@ -125,7 +128,7 @@ def test_split_into_species():
         _,
         global_innovation_history,
     ) = generate_temp_network(
-        network_amount=network_amount, max_hidden_amount=4, connection_amount=30
+        network_amount=network_amount, max_hidden_amount=4, connection_amount=0
     )
     genetic_distance_parameters = {
         "excess_constant": 1.0,
@@ -155,7 +158,11 @@ def test_new_generation():
         base_nodes,
         global_innovation_history,
     ) = generate_temp_network(
-        network_amount=network_amount, max_hidden_amount=0, connection_amount=8
+        network_amount=network_amount,
+        input_amount=4,
+        output_amount=2,
+        max_hidden_amount=0,
+        connection_amount=0,
     )
     genetic_distance_parameters = {
         "excess_constant": 1.0,
@@ -165,8 +172,14 @@ def test_new_generation():
         "threshold": 3.0,
         "interspecies_mating_rate": 0.001,
     }
-    generations = 50
+    mutation_parameters = {
+        "permutation_rate": 0.7,
+        "random_weight_rate": 0.1,
+        "new_connection_rate": 0.05,
+    }
+    generations = 10
     networks_scores = np.zeros(shape=(network_amount))
+    species_reps = []
     for i in range(generations):
         networks_scores = evaluate_networks(
             environments,
@@ -176,19 +189,22 @@ def test_new_generation():
             base_nodes,
             max_steps=200,
             episodes=1,
-            score_exponent=2,
-            render=i == 49,
+            score_exponent=1,
+            render=i == generations - 1,
         )
-        print(i)
-        print(networks_scores.max())
-        print(np.average(networks_scores))
-        print("\n")
-        networks_species = split_into_species(
+        networks_species, species_reps = split_into_species(
             networks_connection_directions,
             networks_connection_weights,
             global_innovation_history,
             genetic_distance_parameters,
+            previous_generation_species_reps=species_reps,
         )
+        print(i)
+        print(networks_scores.max())
+        print(np.average(networks_scores))
+        print(np.unique(networks_species))
+        print(networks_connection_directions[networks_species.argmax()])
+        print("\n")
         (
             networks_connection_directions,
             networks_connection_weights,
@@ -198,12 +214,14 @@ def test_new_generation():
             networks_connection_directions,
             networks_connection_weights,
             networks_connection_states,
+            base_nodes,
             networks_scores,
             networks_species,
             global_innovation_history,
             genetic_distance_parameters,
+            mutation_parameters,
         )
-    assert networks_scores.max() > 0
+    assert networks_scores.max() == 200
 
 
 if __name__ == "__main__":

@@ -251,7 +251,7 @@ def split_into_species(
     previous_generation_species_reps: List[
         Tuple[ConnectionDirections, ConnectionWeights]
     ] = None,
-) -> np.array:
+) -> Tuple[np.array, List[Tuple[ConnectionDirections, ConnectionWeights]]]:
     """assign a species to each network
 
     Arguments:
@@ -301,7 +301,7 @@ def split_into_species(
                 (network_connection_directions, network_connection_weights,)
             )
 
-    return np.array(species)
+    return np.array(species), species_reps
 
 
 def _genetic_distance(
@@ -370,6 +370,10 @@ def _genetic_distance(
         abs(common_connections_weights_a - common_connections_weights_b)
     )
 
+    # edge case when there are no common connections
+    if np.isnan(weight_difference):
+        weight_difference = 0
+
     # get disjoint and excess amounts
     a_disjoints = (
         (uncommon_connection_innovations_a < uncommon_connection_innovations_b.max())
@@ -381,8 +385,8 @@ def _genetic_distance(
         if uncommon_connection_innovations_a.size != 0
         else np.array([])
     )
-    disjoint_amount = np.sum(a_disjoints) + np.sum(b_disjoints)
-    excess_amount = np.sum(a_disjoints == False) + np.sum(b_disjoints == False)
+    disjoint_amount = int(np.sum(a_disjoints) + np.sum(b_disjoints))
+    excess_amount = int(np.sum(a_disjoints == False) + np.sum(b_disjoints == False))
 
     # calculate genetic distance
     c1 = genetic_distance_parameters["excess_constant"]
@@ -390,12 +394,30 @@ def _genetic_distance(
     c3 = genetic_distance_parameters["weight_bias_constant"]
     large_genome_size = genetic_distance_parameters["large_genome_size"]
 
-    largest_genome_size = np.max(
-        (
-            network_a_connection_directions.directions.max(),
-            network_b_connection_directions.directions.max(),
+    if (
+        network_a_connection_directions.directions.size
+        and network_b_connection_directions.directions.size
+    ):
+        largest_genome_size = np.max(
+            (
+                network_a_connection_directions.directions.max(),
+                network_b_connection_directions.directions.max(),
+            )
         )
-    )
+    elif (
+        not network_a_connection_directions.directions.size
+        and network_b_connection_directions.directions.size
+    ):
+        largest_genome_size = network_b_connection_directions.directions.max()
+
+    elif (
+        not network_b_connection_directions.directions.size
+        and network_a_connection_directions.directions.size
+    ):
+        largest_genome_size = network_a_connection_directions.directions.max()
+
+    else:
+        largest_genome_size = 1
 
     # don't normalize excess and disjoint difference in small genomes
     if largest_genome_size < large_genome_size:
@@ -483,6 +505,8 @@ def new_generation(
         if (
             np.random.random_sample()
             > genetic_distance_parameters["interspecies_mating_rate"]
+            or np.unique(networks_species).size
+            == 1  # no interspecies mating when there is only one species
         ):
             species_probabilities: np.ndarray = normalized_scores[
                 networks_species == networks_species[parent_a]
@@ -695,44 +719,63 @@ def _mutate(
 
     # random weight mutation
     random_weight_rate = mutation_parameters["random_weight_rate"]
-    new_weights = np.place(
-        new_weights,
+    np.place(
+        network_connection_weights.weights,
         np.random.choice(
             [True, False],
             p=[1.0 - random_weight_rate, random_weight_rate],
-            size=new_weights.size,
+            size=network_connection_weights.weights.size,
         ),
-        np.random.normal(size=new_weights.size),
+        np.random.normal(size=network_connection_weights.weights.size),
     )
-    network_connection_weights = ConnectionWeights(new_weights)
 
     # new connection mutation
     new_connection_rate = mutation_parameters["new_connection_rate"]
     if np.random.random_sample() < new_connection_rate:
-        all_nodes = np.unique(network_connection_directions.directions)
-        all_possible_connections = (
-            np.mgrid[
-                -1 : all_nodes.max(), max(base_nodes.input_nodes) : all_nodes.max(),
-            ]
-            .reshape(2, -1)
-            .T
-        )
 
-        # pick a random possible connection that isn't already in network connections
-        new_connection_direction = all_possible_connections[
-            np.random.choice(
-                np.where(
-                    _row_in_array(
-                        all_possible_connections,
-                        network_connection_directions.directions,
-                    )
-                    == False
+        # get all possible connections
+        all_nodes = np.unique(
+            np.concatenate(
+                (
+                    np.unique(network_connection_directions.directions),
+                    base_nodes.input_nodes
+                    + base_nodes.output_nodes
+                    + [base_nodes.bias_node],
                 )
             )
-        ]
+        )
+        all_possible_connection_directions = np.array(
+            np.meshgrid(
+                all_nodes,
+                all_nodes[np.invert(np.isin(all_nodes, base_nodes.input_nodes))],
+            )
+        ).T.reshape(-1, 2)
 
-        new_connection_weight = np.random.normal(scale=0.1)
-        new_connection_state = 1
+        # pick a random possible connection that isn't already in network connections
+        available_connections = np.where(
+            _row_in_array(
+                all_possible_connection_directions,
+                network_connection_directions.directions,
+            )
+            == False
+        )[0]
+
+        # there aren't any available connections, no mutation occurs
+        if not available_connections.size:
+            return (
+                network_connection_directions,
+                network_connection_weights,
+                network_connection_states,
+            )
+
+        # generate new connection properties
+        new_connection_direction = all_possible_connection_directions[
+            np.random.choice(available_connections)
+        ].reshape(1, 2)
+        new_connection_weight = np.array([np.random.normal(scale=0.1)])
+        new_connection_state = np.array([1])
+
+        # generate new network with new connection
         new_connection_directions = ConnectionDirections(
             np.concatenate(
                 (network_connection_directions.directions, new_connection_direction)
@@ -744,13 +787,21 @@ def _mutate(
         new_connection_states = ConnectionStates(
             np.concatenate((network_connection_states.states, new_connection_state))
         )
+
+        # update global innovation history
         new_connection_tuple = (
-            new_connection_direction[0],
-            new_connection_direction[1],
+            new_connection_direction[0][0],
+            new_connection_direction[0][1],
         )
-        global_innovation_history.innovations[new_connection_tuple] = (
-            max(global_innovation_history.innovations.values()) + 1
-        )
+
+        # edge-case this is the first innovation
+        if not len(global_innovation_history.innovations):
+            global_innovation_history.innovations[new_connection_tuple] = 0
+        else:
+            global_innovation_history.innovations[new_connection_tuple] = (
+                max(global_innovation_history.innovations.values()) + 1
+            )
+
         return (
             new_connection_directions,
             new_connection_weights,
