@@ -185,7 +185,7 @@ def test_new_generation():
         "new_connection_rate": 0.05,
         "split_connection_rate": 0.03,
     }
-    generations = 1000
+    generations = 100
     networks_scores = np.zeros(shape=(network_amount))
     species_reps = []
     for i in range(generations):
@@ -195,7 +195,7 @@ def test_new_generation():
             networks_connection_weights,
             networks_connection_states,
             base_nodes,
-            max_steps=500,
+            max_steps=200,
             episodes=1,
             score_exponent=1,
             render=i == generations - 1,
@@ -208,31 +208,15 @@ def test_new_generation():
             previous_generation_species_reps=species_reps,
         )
         print(
-            f"""-- Generation {i} --
-best score: {max(networks_scores)}
-average score: {np.average(networks_scores)}
-species: {np.unique(networks_species, return_counts=True)[1]}
-connection innovations:
-    {global_innovation_history}
-node innovations:
-    {global_node_innovation_history}
-
-        """
+            f"\n-- Generation {i} --"
+            f"\nbest score: {max(networks_scores)}"
+            f"\naverage score: {np.average(networks_scores)}"
+            f"\nspecies: {np.unique(networks_species, return_counts=True)[1]}"
+            f"\naverage species score: {dict([(species, np.average(networks_scores[networks_species == species])) for species in networks_species])}"
+            f"\nconnection innovations:\n\t{global_innovation_history}"
+            f"\nnode innovations:\n\t{global_node_innovation_history}"
+            "\n"
         )
-        if max(networks_scores) >= 200:
-            evaluate_networks(
-                environments,
-                networks_connection_directions,
-                networks_connection_weights,
-                networks_connection_states,
-                base_nodes,
-                max_steps=500,
-                episodes=1,
-                score_exponent=1,
-                render=True,
-            )
-            break
-
         (
             networks_connection_directions,
             networks_connection_weights,
