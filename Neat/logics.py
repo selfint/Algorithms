@@ -16,6 +16,7 @@ from structs import (
     ConnectionStates,
     ConnectionDirections,
     Environments,
+    NodeInnovationsMap,
 )
 
 
@@ -378,12 +379,12 @@ def _genetic_distance(
     a_disjoints = (
         (uncommon_connection_innovations_a < uncommon_connection_innovations_b.max())
         if uncommon_connection_innovations_b.size != 0
-        else np.array([])
+        else np.array([False] * uncommon_connection_innovations_a.size)
     )
     b_disjoints = (
         (uncommon_connection_innovations_b < uncommon_connection_innovations_a.max())
         if uncommon_connection_innovations_a.size != 0
-        else np.array([])
+        else np.array([False] * uncommon_connection_innovations_b.size)
     )
     disjoint_amount = int(np.sum(a_disjoints) + np.sum(b_disjoints))
     excess_amount = int(np.sum(a_disjoints == False) + np.sum(b_disjoints == False))
@@ -452,7 +453,7 @@ def _get_common_connection_indices(
 def _vectorized_innovation_lookup(
     global_innovation_history: ConnectionInnovationsMap,
     connection_directions_value: np.ndarray,
-):
+) -> np.ndarray:
     tupled_common_connections = np.array(
         np.array(list(map(tuple, connection_directions_value)), dtype="i, i")
     )
@@ -471,6 +472,7 @@ def new_generation(
     networks_scores: np.ndarray,
     networks_species: np.ndarray,
     global_innovation_history: ConnectionInnovationsMap,
+    global_node_innovation_history: NodeInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
     mutation_parameters: Dict[str, float],
 ) -> Tuple[
@@ -484,7 +486,7 @@ def new_generation(
     normalized_scores = _normalize_scores(networks_scores, networks_species)
 
     # use normalized scores as propabilities to select networks to parent offspings
-    networks_amount = len(normalized_scores)
+    networks_amount = normalized_scores.size
     networks = np.arange(networks_amount)
 
     # lists for new generation
@@ -494,13 +496,45 @@ def new_generation(
     # generate a new network from two randomly chosen parents
     # with each parent being chosen according to its score
     # using crossover and mutation
-    # TODO: assign children amount to each species
-    for _ in range(networks_amount):
+    # TODO: make this more robust
+    # assign children amount to each species
+    child_amounts = np.round(
+        np.array(
+            [
+                networks_scores[networks_species == species].sum()
+                / networks_scores.sum()
+                for species in np.unique(networks_species)
+            ]
+        )
+        * networks_scores.size
+    )[:-1]
+    child_amounts = np.concatenate(
+        (child_amounts, [networks_scores.size - child_amounts.sum()])
+    )
+    assert child_amounts.sum() == networks_species.size
+    for child_species in np.array(
+        [
+            species
+            for species, species_amount in zip(
+                *np.unique(networks_species, return_counts=True)
+            )
+            for _ in range(species_amount)
+        ]
+    ):
 
-        # pick two random parents
-        parent_a: int = np.random.choice(networks, p=normalized_scores)
+        # pick random parent from species
+        species_networks = networks[networks_species == child_species]
+        species_probabilities: np.ndarray = normalized_scores[
+            networks_species == child_species
+        ]
+        # normalize probabilities
+        species_probabilities = species_probabilities / species_probabilities.sum()
+        parent_a: int = np.random.choice(
+            species_networks, p=species_probabilities,
+        )
 
-        # slight chance of inter-species mating
+        # pick parent from the same species with a slight chance of
+        # inter-species mating
         parent_b: int
         if (
             np.random.random_sample()
@@ -508,15 +542,7 @@ def new_generation(
             or np.unique(networks_species).size
             == 1  # no interspecies mating when there is only one species
         ):
-            species_probabilities: np.ndarray = normalized_scores[
-                networks_species == networks_species[parent_a]
-            ]
-            # normalize probabilities
-            species_probabilities = species_probabilities / species_probabilities.sum()
-            parent_b = np.random.choice(
-                networks[np.where(networks_species == networks_species[parent_a])],
-                p=species_probabilities,
-            )
+            parent_b = np.random.choice(species_networks, p=species_probabilities,)
         else:
             species_probabilities = normalized_scores[
                 networks_species != networks_species[parent_a]
@@ -556,6 +582,7 @@ def new_generation(
             new_network_connection_states,
             base_nodes,
             global_innovation_history,
+            global_node_innovation_history,
             mutation_parameters,
         )
         new_networks_connection_directions.append(new_network_connection_directions)
@@ -706,8 +733,26 @@ def _mutate(
     network_connection_states: ConnectionStates,
     base_nodes: BaseNodes,
     global_innovation_history: ConnectionInnovationsMap,
+    global_node_innovation_history: NodeInnovationsMap,
     mutation_parameters: Dict[str, float],
 ) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates]:
+    """mutate a network:
+       - pertrube weight
+       - randomize weight
+       - add connection
+       - split
+
+    Arguments:
+        network_connection_directions {ConnectionDirections} -- ConnectionDirections
+        network_connection_weights {ConnectionWeights} -- ConnectionWeights
+        network_connection_states {ConnectionStates} -- ConnectionStates
+        base_nodes {BaseNodes} -- BaseNodes
+        global_innovation_history {ConnectionInnovationsMap} -- ConnectionInnovationsMap
+        mutation_parameters {Dict[str, float]} -- odds of each mutation occuring
+
+    Returns:
+        Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates] -- mutated network
+    """
     # weight permutation mutation
     permutation_rate = mutation_parameters["permutation_rate"]
     new_weights = network_connection_weights.weights * np.random.choice(
@@ -747,7 +792,13 @@ def _mutate(
         all_possible_connection_directions = np.array(
             np.meshgrid(
                 all_nodes,
-                all_nodes[np.invert(np.isin(all_nodes, base_nodes.input_nodes))],
+                all_nodes[
+                    np.invert(
+                        np.isin(
+                            all_nodes, base_nodes.input_nodes + [base_nodes.bias_node]
+                        )
+                    )
+                ],
             )
         ).T.reshape(-1, 2)
 
@@ -760,53 +811,144 @@ def _mutate(
             == False
         )[0]
 
-        # there aren't any available connections, no mutation occurs
-        if not available_connections.size:
-            return (
-                network_connection_directions,
-                network_connection_weights,
-                network_connection_states,
+        # if there aren't any available connections, no mutation can occur
+        if available_connections.size:
+
+            # generate new connection properties
+            new_connection_direction = all_possible_connection_directions[
+                np.random.choice(available_connections)
+            ].reshape(1, 2)
+            new_connection_weight = np.array([np.random.normal(scale=0.1)])
+            new_connection_state = np.array([1])
+
+            # update global innovation history
+            new_connection_tuple = (
+                new_connection_direction[0][0],
+                new_connection_direction[0][1],
             )
 
-        # generate new connection properties
-        new_connection_direction = all_possible_connection_directions[
-            np.random.choice(available_connections)
-        ].reshape(1, 2)
-        new_connection_weight = np.array([np.random.normal(scale=0.1)])
-        new_connection_state = np.array([1])
+            # edge-case this is the first innovation
+            if not len(global_innovation_history.innovations):
+                global_innovation_history.innovations[new_connection_tuple] = 0
 
-        # generate new network with new connection
-        new_connection_directions = ConnectionDirections(
-            np.concatenate(
-                (network_connection_directions.directions, new_connection_direction)
+            # log innovation if it is new
+            elif not new_connection_tuple in global_innovation_history.innovations:
+                global_innovation_history.innovations[new_connection_tuple] = (
+                    max(global_innovation_history.innovations.values()) + 1
+                )
+
+            # update network
+            network_connection_directions = ConnectionDirections(
+                np.concatenate(
+                    (network_connection_directions.directions, new_connection_direction)
+                )
             )
-        )
-        new_connection_weights = ConnectionWeights(
-            np.concatenate((network_connection_weights.weights, new_connection_weight))
-        )
-        new_connection_states = ConnectionStates(
-            np.concatenate((network_connection_states.states, new_connection_state))
-        )
-
-        # update global innovation history
-        new_connection_tuple = (
-            new_connection_direction[0][0],
-            new_connection_direction[0][1],
-        )
-
-        # edge-case this is the first innovation
-        if not len(global_innovation_history.innovations):
-            global_innovation_history.innovations[new_connection_tuple] = 0
-        else:
-            global_innovation_history.innovations[new_connection_tuple] = (
-                max(global_innovation_history.innovations.values()) + 1
+            network_connection_weights = ConnectionWeights(
+                np.concatenate(
+                    (network_connection_weights.weights, new_connection_weight)
+                )
+            )
+            network_connection_states = ConnectionStates(
+                np.concatenate((network_connection_states.states, new_connection_state))
             )
 
-        return (
-            new_connection_directions,
-            new_connection_weights,
-            new_connection_states,
-        )
+    split_connection_rate = mutation_parameters["split_connection_rate"]
+    if np.random.random_sample() < split_connection_rate:
+
+        # if there aren't any connections, no mutation can occur
+        if network_connection_directions.directions.shape[0]:
+
+            # pick a connection to split
+            split_connection = np.random.randint(
+                network_connection_directions.directions.shape[0]
+            )
+            split_connection_direction: Tuple[int, int] = tuple(
+                network_connection_directions.directions[split_connection]
+            )
+
+            # check if connection has been split in the past
+            if split_connection_direction in global_node_innovation_history.innovations:
+                new_node_id = global_node_innovation_history.innovations[
+                    split_connection_direction
+                ]
+
+            # check if no connections have ever been split
+            elif len(global_node_innovation_history.innovations) == 0:
+                new_node_id = max(base_nodes.output_nodes) + 1
+
+            else:
+                new_node_id = (
+                    max(global_node_innovation_history.innovations.values()) + 1
+                )
+
+            # check if connection has already been split inside this network
+            if not np.isin(new_node_id, network_connection_directions.directions):
+                global_node_innovation_history.innovations[
+                    split_connection_direction
+                ] = new_node_id
+
+                # generate new connections, one leading into new node and one exiting new node
+                lead_connection_direction = [split_connection_direction[0], new_node_id]
+                lead_connection_weight = 1
+                lead_connection_state = 1
+
+                exit_connection_direction = [new_node_id, split_connection_direction[1]]
+                exit_connection_weight = network_connection_weights.weights[
+                    split_connection
+                ]
+                exit_connection_state = 1
+
+                # disable split connection
+                network_connection_states.states[split_connection] = 0
+
+                # update global innovation history
+                # NOTE: the dict can't be empty since we checked that at least 1 connection
+                #       exists
+                if (
+                    not tuple(lead_connection_direction)
+                    in global_innovation_history.innovations
+                ):
+                    global_innovation_history.innovations[
+                        tuple(lead_connection_direction)
+                    ] = (max(global_innovation_history.innovations.values()) + 1)
+
+                if (
+                    not tuple(exit_connection_direction)
+                    in global_innovation_history.innovations
+                ):
+                    global_innovation_history.innovations[
+                        tuple(exit_connection_direction)
+                    ] = (max(global_innovation_history.innovations.values()) + 1)
+
+                # update network
+                network_connection_directions = ConnectionDirections(
+                    np.concatenate(
+                        (
+                            network_connection_directions.directions,
+                            [lead_connection_direction],
+                            [exit_connection_direction],
+                        )
+                    )
+                )
+                network_connection_weights = ConnectionWeights(
+                    np.concatenate(
+                        (
+                            network_connection_weights.weights,
+                            [lead_connection_weight],
+                            [exit_connection_weight],
+                        )
+                    )
+                )
+                network_connection_states = ConnectionStates(
+                    np.concatenate(
+                        (
+                            network_connection_states.states,
+                            [lead_connection_state],
+                            [exit_connection_state],
+                        )
+                    )
+                )
+
     return (
         network_connection_directions,
         network_connection_weights,
@@ -815,26 +957,34 @@ def _mutate(
 
 
 def _normalize_scores(
-    networks_scores: List[float], networks_species: List[int]
-) -> List[float]:
+    networks_scores: np.ndarray, networks_species: np.ndarray
+) -> np.ndarray:
     """normalize scores using species fitness sharing
 
     Arguments:
-        networks_species {List[int]} -- species of each network
-        networks_scores {List[float]} -- scores of each networks from their environments
+        networks_species {np.ndarray} -- species of each network
+        networks_scores {np.ndarray} -- scores of each networks from their environments
 
     Returns:
-        List[float] -- normalized scores
+        np.ndarray -- normalized scores
     """
 
     # species amount is sorted, so each index (of species_amount) is the
     # amount of networks in that species
-    species_amount = np.unique(networks_species, return_counts=True)[1]
+    unique_species, species_amounts = np.unique(
+        np.concatenate((networks_species, range(networks_species.max() + 1))),
+        return_counts=True,
+    )
 
+    if unique_species.size > 1:
+        species_amounts -= 1
+
+    if (species_amounts[networks_species] == 0).any(-1):
+        print("test")
     # normalize scores for each species
     normalized_scores = np.array(
         [
-            network_score / species_amount[network_species]
+            network_score / species_amounts[network_species]
             for network_score, network_species in zip(networks_scores, networks_species)
         ]
     )

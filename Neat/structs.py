@@ -32,6 +32,15 @@ class ConnectionInnovationsMap(NamedTuple):
     innovations: Dict[Tuple[int, int], int]
 
 
+class NodeInnovationsMap(NamedTuple):
+    """
+    maps a split connection to the new node number that
+    represents splitting that connection
+    """
+
+    innovations: Dict[Tuple[int, int], int]
+
+
 class NodeInnovation(NamedTuple):
     split_connection_innovation_index: int
 

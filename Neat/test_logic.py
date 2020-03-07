@@ -1,4 +1,3 @@
-from structs import ConnectionInnovationsMap
 import numpy as np
 import pytest
 import gym
@@ -9,6 +8,8 @@ from logics import (
     ConnectionDirections,
     ConnectionWeights,
     ConnectionStates,
+    ConnectionInnovationsMap,
+    NodeInnovationsMap,
     feed_forward,
     evaluate_networks,
     split_into_species,
@@ -70,12 +71,14 @@ def generate_temp_network(
             innovation_map[tuple_connection] = counter
             counter += 1
     global_innovation_history = ConnectionInnovationsMap(innovation_map)
+    global_node_innovation_history = NodeInnovationsMap(dict())
     return (
         networks_connection_directions,
         networks_connection_weights,
         networks_connection_states,
         base_nodes,
         global_innovation_history,
+        global_node_innovation_history,
     )
 
 
@@ -85,6 +88,7 @@ def test_feed_forward():
         connection_weights,
         connection_states,
         base_nodes,
+        _,
         _,
     ) = generate_temp_network()
     inputs = np.random.random(size=len(base_nodes.input_nodes))
@@ -106,6 +110,7 @@ def test_evaluate_network():
         networks_connection_states,
         base_nodes,
         _,
+        _,
     ) = generate_temp_network(network_amount)
     result = evaluate_networks(
         environments,
@@ -114,7 +119,7 @@ def test_evaluate_network():
         networks_connection_states,
         base_nodes,
         200,
-        100,
+        10,
     )
     print(result)
 
@@ -127,6 +132,7 @@ def test_split_into_species():
         _,
         _,
         global_innovation_history,
+        _,
     ) = generate_temp_network(
         network_amount=network_amount, max_hidden_amount=4, connection_amount=0
     )
@@ -147,7 +153,7 @@ def test_split_into_species():
 
 
 def test_new_generation():
-    network_amount = 100
+    network_amount = 20
     environments = Environments(
         [gym.make("CartPole-v0") for _ in range(network_amount)]
     )
@@ -157,6 +163,7 @@ def test_new_generation():
         networks_connection_states,
         base_nodes,
         global_innovation_history,
+        global_node_innovation_history,
     ) = generate_temp_network(
         network_amount=network_amount,
         input_amount=4,
@@ -176,8 +183,9 @@ def test_new_generation():
         "permutation_rate": 0.7,
         "random_weight_rate": 0.1,
         "new_connection_rate": 0.05,
+        "split_connection_rate": 0.03,
     }
-    generations = 10
+    generations = 1000
     networks_scores = np.zeros(shape=(network_amount))
     species_reps = []
     for i in range(generations):
@@ -187,7 +195,7 @@ def test_new_generation():
             networks_connection_weights,
             networks_connection_states,
             base_nodes,
-            max_steps=200,
+            max_steps=500,
             episodes=1,
             score_exponent=1,
             render=i == generations - 1,
@@ -199,12 +207,32 @@ def test_new_generation():
             genetic_distance_parameters,
             previous_generation_species_reps=species_reps,
         )
-        print(i)
-        print(networks_scores.max())
-        print(np.average(networks_scores))
-        print(np.unique(networks_species))
-        print(networks_connection_directions[networks_species.argmax()])
-        print("\n")
+        print(
+            f"""-- Generation {i} --
+best score: {max(networks_scores)}
+average score: {np.average(networks_scores)}
+species: {np.unique(networks_species, return_counts=True)[1]}
+connection innovations:
+    {global_innovation_history}
+node innovations:
+    {global_node_innovation_history}
+
+        """
+        )
+        if max(networks_scores) >= 200:
+            evaluate_networks(
+                environments,
+                networks_connection_directions,
+                networks_connection_weights,
+                networks_connection_states,
+                base_nodes,
+                max_steps=500,
+                episodes=1,
+                score_exponent=1,
+                render=True,
+            )
+            break
+
         (
             networks_connection_directions,
             networks_connection_weights,
@@ -218,6 +246,7 @@ def test_new_generation():
             networks_scores,
             networks_species,
             global_innovation_history,
+            global_node_innovation_history,
             genetic_distance_parameters,
             mutation_parameters,
         )
