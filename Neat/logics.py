@@ -498,96 +498,122 @@ def new_generation(
     # using crossover and mutation
     # TODO: make children amount calculation more robust - it's kinda random
     # assign children amount to each species
+    unique_species = np.unique(networks_species)
     child_amounts = np.round(
         np.array(
             [
                 networks_scores[networks_species == species].sum()
                 / networks_scores.sum()
-                for species in np.unique(networks_species)
+                for species in unique_species
             ]
         )
         * networks_scores.size
-    )[:-1]
-    child_amounts = np.concatenate(
-        (child_amounts, [networks_scores.size - child_amounts.sum()])
     )
 
-    for child_species in np.array(
-        [
-            species
-            for species, species_amount in zip(
-                *np.unique(networks_species, return_counts=True)
-            )
-            for _ in range(species_amount)
-        ]
-    ):
+    # TODO: kill species that stagnate for 15 generations
+    counter = 0
+    while child_amounts.sum() != networks_amount:
 
-        # pick random parent from species
-        species_networks = networks[networks_species == child_species]
+        # TODO: check for infinite loop
+        counter += 1
+        if counter > 20:
+            print(1)
+        # TODO: maybe don't always update the largest species
+        if child_amounts.sum() < networks_amount:
+            child_amounts[child_amounts.argmax()] += 1
+        if child_amounts.sum() > networks_amount:
+            child_amounts[child_amounts.argmax()] += 1
+
+    for species, species_child_amounts in zip(unique_species, child_amounts):
+        species_networks = networks[networks_species == species]
+
+        # add species champion of large species
+        # TODO: change 5 to variable
+        if species_child_amounts > 5:
+            best_network = int(
+                species_networks[networks_scores[networks_species == species].argmax()]
+            )
+            new_networks_connection_directions.append(
+                networks_connection_directions[best_network]
+            )
+            new_networks_connection_weights.append(
+                networks_connection_weights[best_network]
+            )
+            new_networks_connection_states.append(
+                networks_connection_states[best_network]
+            )
+
         species_probabilities: np.ndarray = normalized_scores[
-            networks_species == child_species
+            networks_species == species
         ]
-        # normalize probabilities
+
         species_probabilities = species_probabilities / species_probabilities.sum()
-        parent_a: int = np.random.choice(
-            species_networks, p=species_probabilities,
-        )
 
-        # pick parent from the same species with a slight chance of
-        # inter-species mating
-        parent_b: int
-        if (
-            np.random.random_sample()
-            > genetic_distance_parameters["interspecies_mating_rate"]
-            or np.unique(networks_species).size
-            == 1  # no interspecies mating when there is only one species
-        ):
-            parent_b = np.random.choice(species_networks, p=species_probabilities,)
-        else:
-            species_probabilities = normalized_scores[
-                networks_species != networks_species[parent_a]
-            ]
+        # TODO: change 5 to variable here too
+        for _ in range(int(species_child_amounts) - int(species_child_amounts > 5)):
 
-            # normalize probabilities
-            species_probabilities = species_probabilities / species_probabilities.sum()
-            parent_b = np.random.choice(
-                networks[np.where(networks_species != networks_species[parent_a])],
-                p=species_probabilities,
+            # pick random parent from species
+            parent_a: int = np.random.choice(
+                species_networks, p=species_probabilities,
             )
 
-        # generate child from two parents
-        (
-            new_network_connection_directions,
-            new_network_connection_weights,
-            new_network_connection_states,
-        ) = _crossover(
-            networks_connection_directions[parent_a],
-            networks_connection_weights[parent_a],
-            networks_connection_states[parent_a],
-            networks_connection_directions[parent_b],
-            networks_connection_weights[parent_b],
-            networks_connection_states[parent_b],
-            global_innovation_history,
-            genetic_distance_parameters,
-        )
+            # pick parent from the same species with a slight chance of
+            # inter-species mating
+            parent_b: int
+            if (
+                np.random.random_sample()
+                > genetic_distance_parameters["interspecies_mating_rate"]
+                or unique_species.size
+                == 1  # no interspecies mating when there is only one species
+            ):
+                parent_b = np.random.choice(species_networks, p=species_probabilities,)
+            else:
+                species_probabilities = normalized_scores[networks_species != species]
 
-        # mutate child
-        (
-            new_network_connection_directions,
-            new_network_connection_weights,
-            new_network_connection_states,
-        ) = _mutate(
-            new_network_connection_directions,
-            new_network_connection_weights,
-            new_network_connection_states,
-            base_nodes,
-            global_innovation_history,
-            global_node_innovation_history,
-            mutation_parameters,
-        )
-        new_networks_connection_directions.append(new_network_connection_directions)
-        new_networks_connection_weights.append(new_network_connection_weights)
-        new_networks_connection_states.append(new_network_connection_states)
+                # normalize probabilities
+                species_probabilities = (
+                    species_probabilities / species_probabilities.sum()
+                )
+                parent_b = np.random.choice(
+                    networks[np.where(networks_species != species)],
+                    p=species_probabilities,
+                )
+
+            # generate child from two parents
+            (
+                new_network_connection_directions,
+                new_network_connection_weights,
+                new_network_connection_states,
+            ) = _crossover(
+                networks_connection_directions[parent_a],
+                networks_connection_weights[parent_a],
+                networks_connection_states[parent_a],
+                networks_connection_directions[parent_b],
+                networks_connection_weights[parent_b],
+                networks_connection_states[parent_b],
+                global_innovation_history,
+                genetic_distance_parameters,
+            )
+
+            # mutate child
+            (
+                new_network_connection_directions,
+                new_network_connection_weights,
+                new_network_connection_states,
+            ) = _mutate(
+                new_network_connection_directions,
+                new_network_connection_weights,
+                new_network_connection_states,
+                base_nodes,
+                global_innovation_history,
+                global_node_innovation_history,
+                mutation_parameters,
+            )
+
+            # add child to new population
+            new_networks_connection_directions.append(new_network_connection_directions)
+            new_networks_connection_weights.append(new_network_connection_weights)
+            new_networks_connection_states.append(new_network_connection_states)
 
     return (
         new_networks_connection_directions,
