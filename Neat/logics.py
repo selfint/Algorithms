@@ -511,7 +511,7 @@ def new_generation(
     child_amounts = np.concatenate(
         (child_amounts, [networks_scores.size - child_amounts.sum()])
     )
-    assert child_amounts.sum() == networks_species.size
+
     for child_species in np.array(
         [
             species
