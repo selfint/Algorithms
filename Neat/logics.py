@@ -740,7 +740,7 @@ def _mutate(
        - pertrube weight
        - randomize weight
        - add connection
-       - split
+       - split connection
 
     Arguments:
         network_connection_directions {ConnectionDirections} -- ConnectionDirections
