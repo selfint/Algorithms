@@ -496,7 +496,7 @@ def new_generation(
     # generate a new network from two randomly chosen parents
     # with each parent being chosen according to its score
     # using crossover and mutation
-    # TODO: make this more robust
+    # TODO: make children amount calculation more robust - it's kinda random
     # assign children amount to each species
     child_amounts = np.round(
         np.array(
