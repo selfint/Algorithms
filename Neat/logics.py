@@ -496,10 +496,9 @@ def new_generation(
     # generate a new network from two randomly chosen parents
     # with each parent being chosen according to its score
     # using crossover and mutation
-    # TODO: make children amount calculation more robust - it's kinda random
     # assign children amount to each species
     unique_species = np.unique(networks_species)
-    child_amounts = np.round(
+    child_amounts = np.ceil(
         np.array(
             [
                 networks_scores[networks_species == species].sum()
@@ -511,25 +510,19 @@ def new_generation(
     )
 
     # TODO: kill species that stagnate for 15 generations
-    counter = 0
     while child_amounts.sum() != networks_amount:
 
-        # TODO: check for infinite loop
-        counter += 1
-        if counter > 20:
-            print(1)
         # TODO: maybe don't always update the largest species
         if child_amounts.sum() < networks_amount:
             child_amounts[child_amounts.argmax()] += 1
         if child_amounts.sum() > networks_amount:
-            child_amounts[child_amounts.argmax()] += 1
+            child_amounts[child_amounts.argmax()] -= 1
 
     for species, species_child_amounts in zip(unique_species, child_amounts):
         species_networks = networks[networks_species == species]
 
         # add species champion of large species
-        # TODO: change 5 to variable
-        if species_child_amounts > 5:
+        if species_child_amounts > mutation_parameters["large_species"]:
             best_network = int(
                 species_networks[networks_scores[networks_species == species].argmax()]
             )
@@ -549,8 +542,10 @@ def new_generation(
 
         species_probabilities = species_probabilities / species_probabilities.sum()
 
-        # TODO: change 5 to variable here too
-        for _ in range(int(species_child_amounts) - int(species_child_amounts > 5)):
+        for _ in range(
+            int(species_child_amounts)
+            - int(species_child_amounts > mutation_parameters["large_species"])
+        ):
 
             # pick random parent from species
             parent_a: int = np.random.choice(
@@ -568,15 +563,17 @@ def new_generation(
             ):
                 parent_b = np.random.choice(species_networks, p=species_probabilities,)
             else:
-                species_probabilities = normalized_scores[networks_species != species]
+                other_species_probabilities = normalized_scores[
+                    networks_species != species
+                ]
 
                 # normalize probabilities
-                species_probabilities = (
-                    species_probabilities / species_probabilities.sum()
+                other_species_probabilities = (
+                    other_species_probabilities / other_species_probabilities.sum()
                 )
                 parent_b = np.random.choice(
-                    networks[np.where(networks_species != species)],
-                    p=species_probabilities,
+                    networks[networks_species != species],
+                    p=other_species_probabilities,
                 )
 
             # generate child from two parents
