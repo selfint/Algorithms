@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
 import gym
+import matplotlib.pyplot as plt
+import pygraphviz as pgv
 
 from logics import (
     Environments,
@@ -153,7 +155,7 @@ def test_split_into_species():
 
 
 def test_new_generation():
-    network_amount = 20
+    network_amount = 150
     environments = Environments(
         [gym.make("CartPole-v0") for _ in range(network_amount)]
     )
@@ -184,22 +186,27 @@ def test_new_generation():
         "random_weight_rate": 0.1,
         "new_connection_rate": 0.05,
         "split_connection_rate": 0.03,
+        "large_species": 5,
     }
     generations = 100
     networks_scores = np.zeros(shape=(network_amount))
     species_reps = []
+    average_scores = []
+    max_scores = []
     for i in range(generations):
-        networks_scores = evaluate_networks(
+        networks_scores: np.ndarray = evaluate_networks(
             environments,
             networks_connection_directions,
             networks_connection_weights,
             networks_connection_states,
             base_nodes,
             max_steps=200,
-            episodes=1,
+            episodes=2,
             score_exponent=1,
-            render=i == generations - 1,
+            render=False,
         )
+        average_scores.append(np.average(networks_scores))
+        max_scores.append(np.max(networks_scores))
         networks_species, species_reps = split_into_species(
             networks_connection_directions,
             networks_connection_weights,
@@ -207,12 +214,25 @@ def test_new_generation():
             genetic_distance_parameters,
             previous_generation_species_reps=species_reps,
         )
+
+        species_amounts = {
+            species: species_amount
+            for species, species_amount in zip(
+                *np.unique(networks_species, return_counts=True)
+            )
+        }
+
+        species_scores = {
+            species: np.average(networks_scores[networks_species == species])
+            for species in networks_species
+        }
+
         print(
             f"\n-- Generation {i} --"
             f"\nbest score: {max(networks_scores)}"
             f"\naverage score: {np.average(networks_scores)}"
-            f"\nspecies: {np.unique(networks_species, return_counts=True)[1]}"
-            f"\naverage species score: {dict([(species, np.average(networks_scores[networks_species == species])) for species in networks_species])}"
+            f"\nspecies: {species_amounts}"
+            f"\naverage species score: {species_scores}"
             f"\nconnection innovations:\n\t{global_innovation_history}"
             f"\nnode innovations:\n\t{global_node_innovation_history}"
             "\n"
@@ -234,6 +254,31 @@ def test_new_generation():
             genetic_distance_parameters,
             mutation_parameters,
         )
+    plt.plot(average_scores, label="avg")
+    plt.plot(max_scores, label="max")
+    plt.legend()
+    plt.show()
+
+    # draw best network
+    best_network = networks_scores.argmax()
+    best_network_connection_directions = networks_connection_directions[best_network]
+    best_network_connection_weights = networks_connection_weights[best_network]
+    best_network_connection_states = networks_connection_states[best_network]
+    G = pgv.AGraph()
+    G.add_edges_from(map(tuple, best_network_connection_directions.directions))
+    G.draw("file.png", prog="fdp")
+
+    # show best network perform
+    evaluate_networks(
+        Environments([gym.make("CartPole-v0")]),
+        [best_network_connection_directions],
+        [best_network_connection_weights],
+        [best_network_connection_states],
+        base_nodes,
+        max_steps=500,
+        episodes=20,
+        render=True,
+    )
     assert networks_scores.max() == 200
 
 
