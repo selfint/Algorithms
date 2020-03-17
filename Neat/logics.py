@@ -502,7 +502,7 @@ def new_generation(
         np.array(
             [
                 networks_scores[networks_species == species].sum()
-                / networks_scores.sum()
+                / (networks_scores.sum() + np.finfo(float).eps)
                 for species in unique_species
             ]
         )
