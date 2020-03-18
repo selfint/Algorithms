@@ -83,8 +83,8 @@ def _get_node_output(
 
     Returns:
         float -- output of node
-    # input nodes are just placeholders for the network input
     """
+    # input nodes are just placeholders for the network input
     if node_id in base_nodes.input_nodes:
         return inputs[node_id]
 
