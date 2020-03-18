@@ -199,8 +199,8 @@ def _get_episode_reward(
     environment: gym.Env,
     max_steps: int,
     connection_directions: ConnectionDirections,
-    connections_weights: ConnectionWeights,
-    connections_states: ConnectionStates,
+    connection_weights: ConnectionWeights,
+    connection_states: ConnectionStates,
     base_nodes: BaseNodes,
     render: bool = False,
 ) -> float:
