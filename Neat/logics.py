@@ -735,6 +735,8 @@ def _crossover(
             )
         )
     )
+
+    # TODO: disable connections with 75% if they were disable in either parent
     child_connection_states = ConnectionStates(
         np.concatenate(
             (
