@@ -524,7 +524,7 @@ def new_generation(
     while child_amounts.sum() != networks_amount:
 
         # randomly select a species to modify
-        chosen_species = np.random.default_rng().choice(np.where(child_amounts > 0))
+        chosen_species = np.random.default_rng().choice(np.where(child_amounts > 0)[0])
         if child_amounts.sum() < networks_amount:
             child_amounts[chosen_species] += 1
         elif child_amounts.sum() > networks_amount:
