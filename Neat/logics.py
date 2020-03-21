@@ -222,8 +222,6 @@ def _get_episode_reward(
 
     # play through simulation
     for _ in range(max_steps):
-        if render:
-            environment.render()
 
         network_output = feed_forward(
             observation,
@@ -234,6 +232,18 @@ def _get_episode_reward(
         )
         action = transform_network_output_discrete(network_output)
         observation, reward, done, _ = environment.step(action)
+
+        # debuging
+        if render:
+            environment.render()
+            # print(
+            #     episode_reward,
+            #     action,
+            #     network_output,
+            #     connection_directions,
+            #     connection_weights,
+            #     connection_states,
+            # )
 
         episode_reward += reward
 
@@ -475,6 +485,7 @@ def new_generation(
     global_node_innovation_history: NodeInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
     mutation_parameters: Dict[str, float],
+    crossover_rate: float
 ) -> Tuple[
     List[ConnectionDirections],
     List[ConnectionWeights],
@@ -483,7 +494,7 @@ def new_generation(
 ]:
 
     # normalize scores using species fitness sharing
-    normalized_scores = _normalize_scores(networks_scores, networks_species)
+    normalized_scores = _normalize_scores_by_species(networks_scores, networks_species)
 
     # use normalized scores as propabilities to select networks to parent offspings
     networks_amount = normalized_scores.size
@@ -513,12 +524,12 @@ def new_generation(
     while child_amounts.sum() != networks_amount:
 
         # randomly select a species to modify
-        chosen_species = np.random.randint(0, child_amounts.size)
+        chosen_species = np.random.default_rng().choice(np.where(child_amounts > 0))
         if child_amounts.sum() < networks_amount:
             child_amounts[chosen_species] += 1
-        if child_amounts.sum() > networks_amount:
+        elif child_amounts.sum() > networks_amount:
             child_amounts[chosen_species] -= 1
-
+    
     for species, species_child_amounts in zip(unique_species, child_amounts):
         species_networks = networks[networks_species == species]
 
@@ -537,10 +548,10 @@ def new_generation(
                 networks_connection_states[best_network]
             )
 
+        # get the probabilities for choosing each mate from this species
         species_probabilities: np.ndarray = normalized_scores[
             networks_species == species
         ]
-
         species_probabilities = species_probabilities / species_probabilities.sum()
 
         for _ in range(
@@ -553,45 +564,54 @@ def new_generation(
                 species_networks, p=species_probabilities,
             )
 
-            # pick parent from the same species with a slight chance of
-            # inter-species mating
-            parent_b: int
-            if (
-                np.random.random_sample()
-                > genetic_distance_parameters["interspecies_mating_rate"]
-                or unique_species.size
-                == 1  # no interspecies mating when there is only one species
-            ):
-                parent_b = np.random.choice(species_networks, p=species_probabilities,)
+            if np.random.random() < crossover_rate:
+
+                # pick parent from the same species with a slight chance of
+                # inter-species mating
+                parent_b: int
+                if (
+                    np.random.random_sample()
+                    > genetic_distance_parameters["interspecies_mating_rate"]
+                    or unique_species.size
+                    == 1  # no interspecies mating when there is only one species
+                ):
+                    parent_b = np.random.choice(species_networks, p=species_probabilities,)
+                else:
+                    other_species_probabilities = normalized_scores[
+                        networks_species != species
+                    ]
+
+                    # normalize probabilities
+                    other_species_probabilities = (
+                        other_species_probabilities / other_species_probabilities.sum()
+                    )
+                    parent_b = np.random.choice(
+                        networks[networks_species != species],
+                        p=other_species_probabilities,
+                    )
+
+                # generate child from two parents
+                (
+                    new_network_connection_directions,
+                    new_network_connection_weights,
+                    new_network_connection_states,
+                ) = _crossover(
+                    networks_connection_directions[parent_a],
+                    networks_connection_weights[parent_a],
+                    networks_connection_states[parent_a],
+                    networks_connection_directions[parent_b],
+                    networks_connection_weights[parent_b],
+                    networks_connection_states[parent_b],
+                    global_innovation_history,
+                    genetic_distance_parameters,
+                )
             else:
-                other_species_probabilities = normalized_scores[
-                    networks_species != species
-                ]
 
-                # normalize probabilities
-                other_species_probabilities = (
-                    other_species_probabilities / other_species_probabilities.sum()
-                )
-                parent_b = np.random.choice(
-                    networks[networks_species != species],
-                    p=other_species_probabilities,
-                )
-
-            # generate child from two parents
-            (
-                new_network_connection_directions,
-                new_network_connection_weights,
-                new_network_connection_states,
-            ) = _crossover(
-                networks_connection_directions[parent_a],
-                networks_connection_weights[parent_a],
-                networks_connection_states[parent_a],
-                networks_connection_directions[parent_b],
-                networks_connection_weights[parent_b],
-                networks_connection_states[parent_b],
-                global_innovation_history,
-                genetic_distance_parameters,
-            )
+                # copy data from parent a with no crossover
+                # TODO: make sure there isn't any weird pointer stuff
+                new_network_connection_directions = ConnectionDirections(networks_connection_directions[parent_a].directions)
+                new_network_connection_weights = ConnectionWeights(networks_connection_weights[parent_a].weights)
+                new_network_connection_states = ConnectionStates(networks_connection_states[parent_a].states)
 
             # mutate child
             (
@@ -657,19 +677,35 @@ def _crossover(
         network_a_connection_directions, network_b_connection_directions
     )
 
-    # TODO: disable connections with 75% if they were disable in either parent
     # inherit common connection properties
     inherited_common_connection_direction_values: np.ndarray = network_a_connection_directions.directions[
         common_connection_indices_a
     ]
 
-    inherited_common_connection_weight_values: np.ndarray = network_a_connection_weights.weights[
-        common_connection_indices_a
-    ]
+    # randomly inherit weight and state properties
+    if inherited_common_connection_direction_values.size != 0:
+        parent_to_inherit_from_mask = np.random.choice(
+            [0, 1], size=np.sum(common_connection_indices_a).size
+        )
+        inherited_common_connection_weight_values = np.choose(
+            parent_to_inherit_from_mask,
+            [
+                network_a_connection_weights.weights[common_connection_indices_a],
+                network_b_connection_weights.weights[common_connection_indices_b],
+            ],
+        )
 
-    inherited_common_connection_state_values: np.ndarray = network_a_connection_states.states[
-        common_connection_indices_a
-    ]
+        # TODO: disable connections with 75% if they were disable in either parent
+        inherited_common_connection_state_values = np.choose(
+            parent_to_inherit_from_mask,
+            [
+                network_a_connection_states.states[common_connection_indices_a],
+                network_b_connection_states.states[common_connection_indices_b],
+            ],
+        )
+    else:
+        inherited_common_connection_weight_values = np.array([])
+        inherited_common_connection_state_values = np.array([])
 
     # inherit uncommon connection properties
     uncommon_connection_direction_values_a: np.array = network_a_connection_directions.directions[
@@ -992,7 +1028,7 @@ def _mutate(
     )
 
 
-def _normalize_scores(
+def _normalize_scores_by_species(
     networks_scores: np.ndarray, networks_species: np.ndarray
 ) -> np.ndarray:
     """normalize scores using species fitness sharing

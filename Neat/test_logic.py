@@ -155,9 +155,10 @@ def test_split_into_species():
 
 
 def test_new_generation():
-    network_amount = 150
+    network_amount = 50
+    environment_name = "MountainCar-v0"
     environments = Environments(
-        [gym.make("CartPole-v0") for _ in range(network_amount)]
+        [gym.make(environment_name) for _ in range(network_amount)]
     )
     (
         networks_connection_directions,
@@ -168,8 +169,8 @@ def test_new_generation():
         global_node_innovation_history,
     ) = generate_temp_network(
         network_amount=network_amount,
-        input_amount=4,
-        output_amount=2,
+        input_amount=2,
+        output_amount=3,
         max_hidden_amount=0,
         connection_amount=0,
     )
@@ -188,23 +189,55 @@ def test_new_generation():
         "split_connection_rate": 0.03,
         "large_species": 5,
     }
-    generations = 100
+    generations = 5
     networks_scores = np.zeros(shape=(network_amount))
     species_reps = []
     average_scores = []
     max_scores = []
-    for i in range(generations):
-        networks_scores: np.ndarray = evaluate_networks(
+    for generation in range(generations):
+
+        # evaluate networks
+        networks_scores = evaluate_networks(
             environments,
             networks_connection_directions,
             networks_connection_weights,
             networks_connection_states,
             base_nodes,
             max_steps=200,
-            episodes=2,
+            episodes=1,
             score_exponent=1,
             render=False,
         )
+
+        # draw best network
+        best_network = networks_scores.argmax()
+        best_network_connection_directions = networks_connection_directions[
+            best_network
+        ]
+        best_network_connection_weights = networks_connection_weights[best_network]
+        best_network_connection_states = networks_connection_states[best_network]
+        G = pgv.AGraph()
+        for (source, dest), weight, enabled in zip(
+            best_network_connection_directions.directions,
+            best_network_connection_weights.weights,
+            best_network_connection_states.states,
+        ):
+            G.add_edge(source, dest, arrowhead="normal")
+        G.draw(f"genomes/best_network_gen_{generation}.png", prog="fdp")
+
+        # show best network perform
+        evaluate_networks(
+            Environments([gym.make(environment_name)]),
+            [best_network_connection_directions],
+            [best_network_connection_weights],
+            [best_network_connection_states],
+            base_nodes,
+            max_steps=200,
+            episodes=1,
+            render=True,
+        )
+
+        # generate next generation
         average_scores.append(np.average(networks_scores))
         max_scores.append(np.max(networks_scores))
         networks_species, species_reps = split_into_species(
@@ -228,7 +261,7 @@ def test_new_generation():
         }
 
         print(
-            f"\n-- Generation {i} --"
+            f"\n-- Generation {generation} --"
             f"\nbest score: {max(networks_scores)}"
             f"\naverage score: {np.average(networks_scores)}"
             f"\nspecies: {species_amounts}"
@@ -254,37 +287,16 @@ def test_new_generation():
             genetic_distance_parameters,
             mutation_parameters,
         )
+
     plt.plot(average_scores, label="avg")
     plt.plot(max_scores, label="max")
     plt.legend()
     plt.show()
 
-    # draw best network
-    best_network = networks_scores.argmax()
-    best_network_connection_directions = networks_connection_directions[best_network]
-    best_network_connection_weights = networks_connection_weights[best_network]
-    best_network_connection_states = networks_connection_states[best_network]
-    G = pgv.AGraph()
-    G.add_edges_from(map(tuple, best_network_connection_directions.directions))
-    G.draw("file.png", prog="fdp")
-
-    # show best network perform
-    evaluate_networks(
-        Environments([gym.make("CartPole-v0")]),
-        [best_network_connection_directions],
-        [best_network_connection_weights],
-        [best_network_connection_states],
-        base_nodes,
-        max_steps=500,
-        episodes=20,
-        render=True,
-    )
-    assert networks_scores.max() == 200
 
 
 if __name__ == "__main__":
-    # test_feed_forward()
+    test_feed_forward()
     # test_evaluate_network()
     # test_split_into_species()
-    test_new_generation()
-
+    # test_new_generation()

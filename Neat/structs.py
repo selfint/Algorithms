@@ -25,6 +25,9 @@ class ConnectionStates(NamedTuple):
 class ConnectionDirections(NamedTuple):
     directions: np.ndarray
 
+    def __iter__(self) -> Iterator[int]:
+        return iter(self.directions)
+
 
 class ConnectionInnovationsMap(NamedTuple):
     """maps a connection direction to an innovation number"""
@@ -46,9 +49,8 @@ class NodeInnovation(NamedTuple):
 
 
 class BaseNodes(NamedTuple):
-    # TODO: convert to numpy arrays
-    input_nodes: List[int]
-    output_nodes: List[int]
+    input_nodes: np.ndarray
+    output_nodes: np.ndarray
     bias_node: int = -1
 
 
