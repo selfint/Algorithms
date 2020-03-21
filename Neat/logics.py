@@ -823,7 +823,13 @@ def _mutate(
                 all_nodes[
                     np.invert(
                         np.isin(
-                            all_nodes, np.concatenate((base_nodes.input_nodes, np.array([base_nodes.bias_node])))
+                            all_nodes,
+                            np.concatenate(
+                                (
+                                    base_nodes.input_nodes,
+                                    np.array([base_nodes.bias_node]),
+                                )
+                            ),
                         )
                     )
                 ],
