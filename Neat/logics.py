@@ -498,7 +498,7 @@ def new_generation(
     # using crossover and mutation
     # assign children amount to each species
     unique_species = np.unique(networks_species)
-    child_amounts = np.ceil(
+    child_amounts: np.ndarray = np.ceil(
         np.array(
             [
                 networks_scores[networks_species == species].sum()
