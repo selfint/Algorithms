@@ -512,11 +512,12 @@ def new_generation(
     # TODO: kill species that stagnate for 15 generations
     while child_amounts.sum() != networks_amount:
 
-        # TODO: maybe don't always update the largest species
+        # randomly select a species to modify
+        chosen_species = np.random.randint(0, child_amounts.size)
         if child_amounts.sum() < networks_amount:
-            child_amounts[child_amounts.argmax()] += 1
+            child_amounts[chosen_species] += 1
         if child_amounts.sum() > networks_amount:
-            child_amounts[child_amounts.argmax()] -= 1
+            child_amounts[chosen_species] -= 1
 
     for species, species_child_amounts in zip(unique_species, child_amounts):
         species_networks = networks[networks_species == species]
