@@ -59,8 +59,8 @@ def generate_temp_network(
         networks_connection_weights.append(connection_weights)
         networks_connection_states.append(connection_states)
     base_nodes = BaseNodes(
-        np.array[range(input_amount)],
-        np.array[range(input_amount, input_amount + output_amount)],
+        np.array(range(input_amount)),
+        np.array(range(input_amount, input_amount + output_amount)),
     )
     all_chosen_connections = np.array(all_chosen_connections).reshape(-1, 2)
     innovation_map = dict()
