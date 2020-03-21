@@ -101,13 +101,16 @@ if __name__ == "__main__":
         ]
         best_network_connection_weights = networks_connection_weights[best_network]
         best_network_connection_states = networks_connection_states[best_network]
-        G = pgv.AGraph()
+        G = pgv.AGraph(directed=True)
         for (source, dest), weight, enabled in zip(
             best_network_connection_directions.directions,
             best_network_connection_weights.weights,
             best_network_connection_states.states,
         ):
-            G.add_edge(source, dest, arrowhead="normal")
+            color = "black" if not enabled else "blue" if weight > 0 else "red"
+            penwidth = abs(weight) * 2
+
+            G.add_edge(source, dest, color=color, penwidth=penwidth)
         G.draw(f"genomes/best_network_gen_{generation}.png", prog="fdp")
 
         # show best network perform
