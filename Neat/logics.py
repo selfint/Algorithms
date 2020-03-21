@@ -228,8 +228,8 @@ def _get_episode_reward(
         network_output = feed_forward(
             observation,
             connection_directions,
-            connections_weights,
-            connections_states,
+            connection_weights,
+            connection_states,
             base_nodes,
         )
         action = transform_network_output_discrete(network_output)
