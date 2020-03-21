@@ -657,6 +657,7 @@ def _crossover(
         network_a_connection_directions, network_b_connection_directions
     )
 
+    # TODO: disable connections with 75% if they were disable in either parent
     # inherit common connection properties
     inherited_common_connection_direction_values: np.ndarray = network_a_connection_directions.directions[
         common_connection_indices_a
@@ -736,7 +737,6 @@ def _crossover(
         )
     )
 
-    # TODO: disable connections with 75% if they were disable in either parent
     child_connection_states = ConnectionStates(
         np.concatenate(
             (
