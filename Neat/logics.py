@@ -807,9 +807,13 @@ def _mutate(
             np.concatenate(
                 (
                     np.unique(network_connection_directions.directions),
-                    base_nodes.input_nodes
-                    + base_nodes.output_nodes
-                    + [base_nodes.bias_node],
+                    np.concatenate(
+                        (
+                            base_nodes.input_nodes,
+                            base_nodes.output_nodes,
+                            np.array([base_nodes.bias_node]),
+                        )
+                    ),
                 )
             )
         )
@@ -819,7 +823,7 @@ def _mutate(
                 all_nodes[
                     np.invert(
                         np.isin(
-                            all_nodes, base_nodes.input_nodes + [base_nodes.bias_node]
+                            all_nodes, np.concatenate((base_nodes.input_nodes, np.array([base_nodes.bias_node])))
                         )
                     )
                 ],
