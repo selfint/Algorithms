@@ -129,7 +129,7 @@ def _get_node_output(
     )
 
 
-def transform_network_output_discrete(network_output: List[float]) -> spaces.Discrete:
+def transform_network_output_discrete(network_output: np.ndarray) -> spaces.Discrete:
     return np.argmax(network_output)
 
 
