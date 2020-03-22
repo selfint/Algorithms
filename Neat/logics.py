@@ -485,7 +485,7 @@ def new_generation(
     global_node_innovation_history: NodeInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
     mutation_parameters: Dict[str, float],
-    crossover_rate: float
+    crossover_parameters: Dict[str, float],
 ) -> Tuple[
     List[ConnectionDirections],
     List[ConnectionWeights],
@@ -529,7 +529,7 @@ def new_generation(
             child_amounts[chosen_species] += 1
         elif child_amounts.sum() > networks_amount:
             child_amounts[chosen_species] -= 1
-    
+
     for species, species_child_amounts in zip(unique_species, child_amounts):
         species_networks = networks[networks_species == species]
 
@@ -564,7 +564,7 @@ def new_generation(
                 species_networks, p=species_probabilities,
             )
 
-            if np.random.random() < crossover_rate:
+            if np.random.random() < crossover_parameters["crossover_rate"]:
 
                 # pick parent from the same species with a slight chance of
                 # inter-species mating
@@ -575,7 +575,9 @@ def new_generation(
                     or unique_species.size
                     == 1  # no interspecies mating when there is only one species
                 ):
-                    parent_b = np.random.choice(species_networks, p=species_probabilities,)
+                    parent_b = np.random.choice(
+                        species_networks, p=species_probabilities,
+                    )
                 else:
                     other_species_probabilities = normalized_scores[
                         networks_species != species
@@ -604,13 +606,20 @@ def new_generation(
                     networks_connection_states[parent_b],
                     global_innovation_history,
                     genetic_distance_parameters,
+                    crossover_parameters,
                 )
             else:
 
                 # copy data from parent a with no crossover
-                new_network_connection_directions = ConnectionDirections(networks_connection_directions[parent_a].directions)
-                new_network_connection_weights = ConnectionWeights(networks_connection_weights[parent_a].weights)
-                new_network_connection_states = ConnectionStates(networks_connection_states[parent_a].states)
+                new_network_connection_directions = ConnectionDirections(
+                    networks_connection_directions[parent_a].directions
+                )
+                new_network_connection_weights = ConnectionWeights(
+                    networks_connection_weights[parent_a].weights
+                )
+                new_network_connection_states = ConnectionStates(
+                    networks_connection_states[parent_a].states
+                )
 
             # mutate child
             (
@@ -649,6 +658,7 @@ def _crossover(
     network_b_connection_states: ConnectionStates,
     global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
+    crossover_parameters: Dict[str, float],
 ) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates]:
     """combine two networks to form a child network
 
@@ -694,7 +704,6 @@ def _crossover(
             ],
         )
 
-        # TODO: disable connections with 75% if they were disable in either parent
         inherited_common_connection_state_values = np.choose(
             parent_to_inherit_from_mask,
             [
@@ -702,6 +711,21 @@ def _crossover(
                 network_b_connection_states.states[common_connection_indices_b],
             ],
         )
+
+        # TODO this might slow performance significantly, maybe there is a numpy way to do it
+        for index, (a_gene_state, b_gene_state) in enumerate(
+            zip(
+                network_a_connection_states.states[common_connection_indices_a],
+                network_b_connection_states.states[common_connection_indices_b],
+            )
+        ):
+
+            # disable child gene if it is disabled in either parent
+            if (
+                a_gene_state == 0 or b_gene_state == 0
+            ) and np.random.random() < crossover_parameters["disable_connection_rate"]:
+                inherited_common_connection_state_values[index] = 0
+
     else:
         inherited_common_connection_weight_values = np.array([])
         inherited_common_connection_state_values = np.array([])

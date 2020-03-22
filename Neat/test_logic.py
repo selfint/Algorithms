@@ -175,7 +175,10 @@ def test_new_generation():
         "split_connection_rate": 0.03,
         "large_species": 5,
     }
-    crossover_rate = 0.75
+    crossover_parameters = {
+        "crossover_rate": 0.75,
+        "disable_connection_rate": 0.75
+    }
 
     # build environments and networks
     environments = Environments(
@@ -249,7 +252,7 @@ def test_new_generation():
             global_node_innovation_history,
             genetic_distance_parameters,
             mutation_parameters,
-            crossover_rate,
+            crossover_parameters,
         )
 
     # plot results

@@ -177,5 +177,5 @@ if __name__ == "__main__":
             global_node_innovation_history,
             GENETIC_DISTANCE_PARAMETERS,
             MUTATION_PARAMETERS,
-            CROSSOVER_RATE
+            CROSSOVER_RATE,
         )
