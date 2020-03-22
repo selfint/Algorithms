@@ -608,7 +608,6 @@ def new_generation(
             else:
 
                 # copy data from parent a with no crossover
-                # TODO: make sure there isn't any weird pointer stuff
                 new_network_connection_directions = ConnectionDirections(networks_connection_directions[parent_a].directions)
                 new_network_connection_weights = ConnectionWeights(networks_connection_weights[parent_a].weights)
                 new_network_connection_states = ConnectionStates(networks_connection_states[parent_a].states)
