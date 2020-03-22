@@ -49,7 +49,9 @@ if __name__ == "__main__":
     networks_connection_weights = []
     networks_connection_states = []
     for _ in range(NETWORK_AMOUNT):
-        networks_connection_directions.append(ConnectionDirections(np.array([], dtype=np.int).reshape(-1, 2)))
+        networks_connection_directions.append(
+            ConnectionDirections(np.array([], dtype=np.int).reshape(-1, 2))
+        )
         networks_connection_weights.append(ConnectionWeights(np.array([])))
         networks_connection_states.append(ConnectionStates(np.array([])))
 
