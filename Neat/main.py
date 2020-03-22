@@ -71,7 +71,6 @@ if __name__ == "__main__":
     global_node_innovation_history = NodeInnovationsMap(dict())
 
     # init variables
-    networks_scores = np.zeros(shape=(NETWORK_AMOUNT))
     species_reps: List[Tuple[ConnectionDirections, ConnectionWeights]] = []
     average_scores: List[float] = []
     max_scores: List[float] = []
