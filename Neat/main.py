@@ -33,7 +33,10 @@ MUTATION_PARAMETERS = {
     "split_connection_rate": 0.03,
     "large_species": 5,
 }
-CROSSOVER_RATE = 0.75
+CROSSOVER_PARAMETERS = {
+    "crossover_rate": 0.75,
+    "disable_connection_rate": 0.75,
+}
 GENERATIONS = 100
 
 
@@ -177,5 +180,5 @@ if __name__ == "__main__":
             global_node_innovation_history,
             GENETIC_DISTANCE_PARAMETERS,
             MUTATION_PARAMETERS,
-            CROSSOVER_RATE,
+            CROSSOVER_PARAMETERS,
         )
