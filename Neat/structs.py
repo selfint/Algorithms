@@ -44,10 +44,6 @@ class NodeInnovationsMap(NamedTuple):
     innovations: Dict[Tuple[int, int], int]
 
 
-class NodeInnovation(NamedTuple):
-    split_connection_innovation_index: int
-
-
 class BaseNodes(NamedTuple):
     input_nodes: np.ndarray
     output_nodes: np.ndarray

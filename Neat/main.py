@@ -74,7 +74,7 @@ if __name__ == "__main__":
     )
 
     # generate innovation history maps
-    global_innovation_history = ConnectionInnovationsMap(dict())
+    global_connection_innovation_history = ConnectionInnovationsMap(dict())
     global_node_innovation_history = NodeInnovationsMap(dict())
 
     # init variables
@@ -137,7 +137,7 @@ if __name__ == "__main__":
         networks_species, species_reps = split_into_species(
             networks_connection_directions,
             networks_connection_weights,
-            global_innovation_history,
+            global_connection_innovation_history,
             GENETIC_DISTANCE_PARAMETERS,
             previous_generation_species_reps=species_reps,
         )
@@ -160,7 +160,7 @@ if __name__ == "__main__":
             f"\naverage score: {np.average(networks_scores)}"
             f"\nspecies: {species_amounts}"
             f"\naverage species score: {species_scores}"
-            f"\nconnection innovations:\n\t{global_innovation_history}"
+            f"\nconnection innovations:\n\t{global_connection_innovation_history}"
             f"\nnode innovations:\n\t{global_node_innovation_history}"
             "\n"
         )
@@ -168,7 +168,7 @@ if __name__ == "__main__":
             networks_connection_directions,
             networks_connection_weights,
             networks_connection_states,
-            global_innovation_history,
+            global_connection_innovation_history,
         ) = new_generation(
             networks_connection_directions,
             networks_connection_weights,
@@ -176,9 +176,10 @@ if __name__ == "__main__":
             base_nodes,
             networks_scores,
             networks_species,
-            global_innovation_history,
+            global_connection_innovation_history,
             global_node_innovation_history,
             GENETIC_DISTANCE_PARAMETERS,
             MUTATION_PARAMETERS,
             CROSSOVER_PARAMETERS,
         )
+global_connection_innovation_history

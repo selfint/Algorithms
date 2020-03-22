@@ -320,7 +320,7 @@ def _genetic_distance(
     network_a_connection_weights: ConnectionWeights,
     network_b_connection_directions: ConnectionDirections,
     network_b_connection_weights: ConnectionWeights,
-    global_innovation_history: ConnectionInnovationsMap,
+    global_connection_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
 ) -> float:
     """calculate the genetic distance between two networks
@@ -330,6 +330,7 @@ def _genetic_distance(
         network_a_connection_weights {ConnectionWeights} -- weights of connections of network a
         network_b_connection_directions {ConnectionDirections} -- connections of network b
         network_b_connections_weights {ConnectionWeights} -- data of connections of network b
+        global_connection_innovation_history {ConnectionInnovationsMap} -- connection innovation history
         genetic_distance_parameters {Dict[str, float]} -- hyperparameters for genetic distance
 
     Returns:
@@ -369,11 +370,11 @@ def _genetic_distance(
 
     # get uncommon connection innovation numbers
     uncommon_connection_innovations_a = _vectorized_innovation_lookup(
-        global_innovation_history, uncommon_connections_directions_a
+        global_connection_innovation_history, uncommon_connections_directions_a
     )
 
     uncommon_connection_innovations_b = _vectorized_innovation_lookup(
-        global_innovation_history, uncommon_connections_directions_b
+        global_connection_innovation_history, uncommon_connections_directions_b
     )
 
     # get the average distance between two connection weights
@@ -461,7 +462,7 @@ def _get_common_connection_indices(
 
 
 def _vectorized_innovation_lookup(
-    global_innovation_history: ConnectionInnovationsMap,
+    global_connection_innovation_history: ConnectionInnovationsMap,
     connection_directions_value: np.ndarray,
 ) -> np.ndarray:
     tupled_common_connections = np.array(
@@ -469,7 +470,7 @@ def _vectorized_innovation_lookup(
     )
     if tupled_common_connections.size == 0:
         return np.array([])
-    return np.vectorize(lambda c: global_innovation_history.innovations[tuple(c)])(
+    return np.vectorize(lambda c: global_connection_innovation_history.innovations[tuple(c)])(
         tupled_common_connections
     )
 
@@ -481,7 +482,7 @@ def new_generation(
     base_nodes: BaseNodes,
     networks_scores: np.ndarray,
     networks_species: np.ndarray,
-    global_innovation_history: ConnectionInnovationsMap,
+    global_connection_innovation_history: ConnectionInnovationsMap,
     global_node_innovation_history: NodeInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
     mutation_parameters: Dict[str, float],
@@ -504,6 +505,7 @@ def new_generation(
     new_networks_connection_directions = []
     new_networks_connection_weights = []
     new_networks_connection_states = []
+
     # generate a new network from two randomly chosen parents
     # with each parent being chosen according to its score
     # using crossover and mutation
@@ -604,7 +606,6 @@ def new_generation(
                     networks_connection_directions[parent_b],
                     networks_connection_weights[parent_b],
                     networks_connection_states[parent_b],
-                    global_innovation_history,
                     genetic_distance_parameters,
                     crossover_parameters,
                 )
@@ -631,7 +632,7 @@ def new_generation(
                 new_network_connection_weights,
                 new_network_connection_states,
                 base_nodes,
-                global_innovation_history,
+                global_connection_innovation_history,
                 global_node_innovation_history,
                 mutation_parameters,
             )
@@ -645,7 +646,7 @@ def new_generation(
         new_networks_connection_directions,
         new_networks_connection_weights,
         new_networks_connection_states,
-        global_innovation_history,
+        global_connection_innovation_history,
     )
 
 
@@ -656,7 +657,6 @@ def _crossover(
     network_b_connection_directions: ConnectionDirections,
     network_b_connection_weights: ConnectionWeights,
     network_b_connection_states: ConnectionStates,
-    global_innovation_history: ConnectionInnovationsMap,
     genetic_distance_parameters: Dict[str, float],
     crossover_parameters: Dict[str, float],
 ) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates]:
@@ -669,7 +669,6 @@ def _crossover(
         network_b_connection_directions {ConnectionDirections} -- ConnectionDirections
         network_b_connection_weights {ConnectionWeights} -- ConnectionWeights
         network_b_connection_states {ConnectionStates} -- ConnectionStates
-        global_innovation_history {ConnectionInnovationsMap} -- ConnectionInnovationsMap
         genetic_distance_parameters {Dict[str, float]} -- Dict[str, float]
 
     Returns:
@@ -817,7 +816,7 @@ def _mutate(
     network_connection_weights: ConnectionWeights,
     network_connection_states: ConnectionStates,
     base_nodes: BaseNodes,
-    global_innovation_history: ConnectionInnovationsMap,
+    global_connection_innovation_history: ConnectionInnovationsMap,
     global_node_innovation_history: NodeInnovationsMap,
     mutation_parameters: Dict[str, float],
 ) -> Tuple[ConnectionDirections, ConnectionWeights, ConnectionStates]:
@@ -832,7 +831,7 @@ def _mutate(
         network_connection_weights {ConnectionWeights} -- ConnectionWeights
         network_connection_states {ConnectionStates} -- ConnectionStates
         base_nodes {BaseNodes} -- BaseNodes
-        global_innovation_history {ConnectionInnovationsMap} -- ConnectionInnovationsMap
+        global_connection_innovation_history {ConnectionInnovationsMap} -- ConnectionInnovationsMap
         mutation_parameters {Dict[str, float]} -- odds of each mutation occuring
 
     Returns:
@@ -923,13 +922,13 @@ def _mutate(
             )
 
             # edge-case this is the first innovation
-            if not len(global_innovation_history.innovations):
-                global_innovation_history.innovations[new_connection_tuple] = 0
+            if not len(global_connection_innovation_history.innovations):
+                global_connection_innovation_history.innovations[new_connection_tuple] = 0
 
             # log innovation if it is new
-            elif not new_connection_tuple in global_innovation_history.innovations:
-                global_innovation_history.innovations[new_connection_tuple] = (
-                    max(global_innovation_history.innovations.values()) + 1
+            elif not new_connection_tuple in global_connection_innovation_history.innovations:
+                global_connection_innovation_history.innovations[new_connection_tuple] = (
+                    max(global_connection_innovation_history.innovations.values()) + 1
                 )
 
             # update network
@@ -1001,19 +1000,19 @@ def _mutate(
                 #       exists
                 if (
                     not tuple(lead_connection_direction)
-                    in global_innovation_history.innovations
+                    in global_connection_innovation_history.innovations
                 ):
-                    global_innovation_history.innovations[
+                    global_connection_innovation_history.innovations[
                         tuple(lead_connection_direction)
-                    ] = (max(global_innovation_history.innovations.values()) + 1)
+                    ] = (max(global_connection_innovation_history.innovations.values()) + 1)
 
                 if (
                     not tuple(exit_connection_direction)
-                    in global_innovation_history.innovations
+                    in global_connection_innovation_history.innovations
                 ):
-                    global_innovation_history.innovations[
+                    global_connection_innovation_history.innovations[
                         tuple(exit_connection_direction)
-                    ] = (max(global_innovation_history.innovations.values()) + 1)
+                    ] = (max(global_connection_innovation_history.innovations.values()) + 1)
 
                 # update network
                 network_connection_directions = ConnectionDirections(
