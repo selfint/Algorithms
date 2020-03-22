@@ -155,8 +155,29 @@ def test_split_into_species():
 
 
 def test_new_generation():
+
+    # parameters
+    generations = 20
     network_amount = 50
     environment_name = "MountainCar-v0"
+    genetic_distance_parameters = {
+        "excess_constant": 1.0,
+        "disjoint_constant": 1.0,
+        "weight_bias_constant": 0.4,
+        "large_genome_size": 20,
+        "threshold": 3.0,
+        "interspecies_mating_rate": 0.001,
+    }
+    mutation_parameters = {
+        "permutation_rate": 0.7,
+        "random_weight_rate": 0.1,
+        "new_connection_rate": 0.05,
+        "split_connection_rate": 0.03,
+        "large_species": 5,
+    }
+    crossover_rate = 0.75
+
+    # build environments and networks
     environments = Environments(
         [gym.make(environment_name) for _ in range(network_amount)]
     )
@@ -174,26 +195,15 @@ def test_new_generation():
         max_hidden_amount=0,
         connection_amount=0,
     )
-    genetic_distance_parameters = {
-        "excess_constant": 1.0,
-        "disjoint_constant": 1.0,
-        "weight_bias_constant": 0.4,
-        "large_genome_size": 20,
-        "threshold": 3.0,
-        "interspecies_mating_rate": 0.001,
-    }
-    mutation_parameters = {
-        "permutation_rate": 0.7,
-        "random_weight_rate": 0.1,
-        "new_connection_rate": 0.05,
-        "split_connection_rate": 0.03,
-        "large_species": 5,
-    }
-    generations = 5
-    networks_scores = np.zeros(shape=(network_amount))
+
+    # initialize species reps as an empty list
     species_reps = []
+
+    # logging
     average_scores = []
     max_scores = []
+
+    # test new generation
     for generation in range(generations):
 
         # evaluate networks
@@ -209,37 +219,11 @@ def test_new_generation():
             render=False,
         )
 
-        # draw best network
-        best_network = networks_scores.argmax()
-        best_network_connection_directions = networks_connection_directions[
-            best_network
-        ]
-        best_network_connection_weights = networks_connection_weights[best_network]
-        best_network_connection_states = networks_connection_states[best_network]
-        G = pgv.AGraph()
-        for (source, dest), weight, enabled in zip(
-            best_network_connection_directions.directions,
-            best_network_connection_weights.weights,
-            best_network_connection_states.states,
-        ):
-            G.add_edge(source, dest, arrowhead="normal")
-        G.draw(f"genomes/best_network_gen_{generation}.png", prog="fdp")
-
-        # show best network perform
-        evaluate_networks(
-            Environments([gym.make(environment_name)]),
-            [best_network_connection_directions],
-            [best_network_connection_weights],
-            [best_network_connection_states],
-            base_nodes,
-            max_steps=200,
-            episodes=1,
-            render=True,
-        )
-
-        # generate next generation
+        # log scores
         average_scores.append(np.average(networks_scores))
         max_scores.append(np.max(networks_scores))
+
+        # split into species, and get the new species reps
         networks_species, species_reps = split_into_species(
             networks_connection_directions,
             networks_connection_weights,
@@ -248,28 +232,7 @@ def test_new_generation():
             previous_generation_species_reps=species_reps,
         )
 
-        species_amounts = {
-            species: species_amount
-            for species, species_amount in zip(
-                *np.unique(networks_species, return_counts=True)
-            )
-        }
-
-        species_scores = {
-            species: np.average(networks_scores[networks_species == species])
-            for species in networks_species
-        }
-
-        print(
-            f"\n-- Generation {generation} --"
-            f"\nbest score: {max(networks_scores)}"
-            f"\naverage score: {np.average(networks_scores)}"
-            f"\nspecies: {species_amounts}"
-            f"\naverage species score: {species_scores}"
-            f"\nconnection innovations:\n\t{global_innovation_history}"
-            f"\nnode innovations:\n\t{global_node_innovation_history}"
-            "\n"
-        )
+        # generate new networks
         (
             networks_connection_directions,
             networks_connection_weights,
@@ -286,17 +249,12 @@ def test_new_generation():
             global_node_innovation_history,
             genetic_distance_parameters,
             mutation_parameters,
+            crossover_rate,
         )
 
+    # plot results
     plt.plot(average_scores, label="avg")
     plt.plot(max_scores, label="max")
     plt.legend()
+    plt.title(f"Score history from training for {generations} generations")
     plt.show()
-
-
-
-if __name__ == "__main__":
-    test_feed_forward()
-    # test_evaluate_network()
-    # test_split_into_species()
-    # test_new_generation()
