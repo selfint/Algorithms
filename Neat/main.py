@@ -63,7 +63,9 @@ if __name__ == "__main__":
     output_node_amount = test_env.action_space.n
     base_nodes = BaseNodes(
         np.arange(input_node_amount, dtype=np.int),
-        np.arange(input_node_amount, input_node_amount + output_node_amount, dtype=np.int),
+        np.arange(
+            input_node_amount, input_node_amount + output_node_amount, dtype=np.int
+        ),
     )
 
     # generate innovation history maps
