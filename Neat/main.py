@@ -182,4 +182,3 @@ if __name__ == "__main__":
             MUTATION_PARAMETERS,
             CROSSOVER_PARAMETERS,
         )
-global_connection_innovation_history
