@@ -6,7 +6,7 @@ import gym
 from typing import List
 
 
-from NeuroEvolution.algorithm import NeuroEvolution
+from algorithm import NeuroEvolution
 
 # env and hyper parameters setup
 ENV_NAME = "CartPole-v0"
